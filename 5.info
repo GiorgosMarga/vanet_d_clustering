@@ -1,0 +1,13 @@
+CNN[0]=5	PCH[0]=5
+Round: 0: CNN: 5, degree: 1
+CNN: 5 comparing with 4 (3.212461)
+PCH Id: 4
+Round: 1: CNN: 4, degree: 2
+CNN: 4 comparing with 1 (2.572792)
+PCH Id: 1
+Round: 2: CNN: 1, degree: 3
+CNN: 1 comparing with 2 (2.512461)
+CNN: 1 comparing with 10 (2.900000)
+PCH Id: 1
+5 4 1 
+5(1) 4(1) 1(1) 

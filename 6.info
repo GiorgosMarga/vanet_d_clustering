@@ -1,0 +1,14 @@
+CNN[0]=6	PCH[0]=6
+Round: 0: CNN: 6, degree: 3
+CNN: 6 comparing with 7 (2.972792)
+CNN: 6 comparing with 8 (1.972792)
+CNN: 6 comparing with 3 (2.072792)
+PCH Id: 6
+Round: 1: CNN: 8, degree: 1
+CNN: 8 comparing with 2 (2.946050)
+PCH Id: 6
+Round: 2: CNN: 2, degree: 2
+CNN: 2 comparing with 1 (2.512461)
+PCH Id: 6
+6 8 2 
+6(6) 6(6) 6(6) 

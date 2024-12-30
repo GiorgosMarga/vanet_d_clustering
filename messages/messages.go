@@ -43,6 +43,10 @@ type PCHMessage struct {
 	Round int
 }
 
+type CHMessage struct {
+	
+}
+
 func NewBeaconMessage(velocity, posx, posy float64, senderId, degree int) *BeaconMessage {
 	return &BeaconMessage{
 		Velocity: velocity,

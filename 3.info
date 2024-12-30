@@ -1,0 +1,18 @@
+CNN[0]=3	PCH[0]=3
+Round: 0: CNN: 3, degree: 2
+CNN: 3 comparing with 6 (2.072792)
+CNN: 3 comparing with 2 (1.472792)
+PCH Id: 3
+Round: 1: CNN: 2, degree: 2
+CNN: 2 comparing with 7 (3.946050)
+CNN: 2 comparing with 1 (2.512461)
+CNN: 2 comparing with 8 (2.946050)
+PCH Id: 1
+Round: 2: CNN: 1, degree: 3
+CNN: 1 comparing with 4 (2.572792)
+CNN: 1 comparing with 10 (2.900000)
+PCH Id: 1
+3 2 1 
+3(1) 3(1) 1(1) 
+Passing through 2(3)
+Didn't find a better CH. Old CH: 1	New CH: 3

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+
 	"math/rand"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/graph"
@@ -9,18 +11,34 @@ import (
 
 func main() {
 	r := rand.New(rand.NewSource(100))
-
+	var speed = map[int]float64{
+		1:  3,
+		2:  3.4,
+		3:  2.6,
+		4:  2.8,
+		5:  3.3,
+		6:  3.4,
+		7:  3.2,
+		8:  3,
+		9:  2.9,
+		10: 2.8,
+		11: 3.2,
+		12: 2.9,
+		13: 3,
+		14: 3.1,
+	}
+	_ = speed
 	var position map[int][2]float64 = map[int][2]float64{
 		1:  {5, 3},
 		2:  {7, 4},
 		3:  {8, 5},
-		4:  {7, 2},
+		4:  {6, 2},
 		5:  {8, 1},
 		6:  {9, 4},
 		7:  {10, 5},
 		8:  {10, 3},
 		9:  {4, 5},
-		10: {3, 3},
+		10: {2, 3},
 		11: {2, 0},
 		12: {1, 5},
 		13: {0, 4},
@@ -28,8 +46,8 @@ func main() {
 	}
 
 	g := graph.NewGraph(14)
-	for i := range 14 {
-		n := graph.NewNode(i+1, position[i+1][0], position[i+1][1], float64(r.Intn(30)+20))
+	for i := range 14 { //float64(r.Intn(30)+20)
+		n := graph.NewNode(i+1, position[i+1][0], position[i+1][1], float64(r.Intn(30)+20), fmt.Sprintf("%d.info", i+1))
 		g.AddNode(n)
 	}
 

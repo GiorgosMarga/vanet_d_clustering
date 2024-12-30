@@ -1,0 +1,18 @@
+CNN[0]=12	PCH[0]=12
+Round: 0: CNN: 12, degree: 2
+CNN: 12 comparing with 13 (1.372792)
+CNN: 12 comparing with 10 (2.112461)
+PCH Id: 12
+Round: 1: CNN: 13, degree: 2
+CNN: 13 comparing with 11 (4.824922)
+CNN: 13 comparing with 14 (3.000000)
+CNN: 13 comparing with 1 (4.589118)
+CNN: 13 comparing with 9 (4.810795)
+PCH Id: 12
+Round: 2: CNN: 14, degree: 2
+CNN: 14 comparing with 2 (7.654196)
+CNN: 14 comparing with 4 (7.074486)
+PCH Id: 12
+No CMS. Chose new clusterhead 10
+12 13 14 
+12(10) 12(10) 12(10) 
