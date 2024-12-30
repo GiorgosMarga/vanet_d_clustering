@@ -131,6 +131,8 @@ func (g *Graph) DHCV(d int) {
 
 	time.Sleep(500 * time.Millisecond)
 	// exception 1
+
+
 mainLoop:
 	for _, n := range g.Nodes {
 		ch := n.PCH[d]
