@@ -36,26 +36,48 @@ type BeaconMessage struct {
 	PosY     float64
 	Degree   int
 	SenderId int
+	Round    int
 }
 
-type PCHMessage struct {
-	Node  any
+type CNNMessage struct {
+	SenderId int
+	CNN      any
+	Round    int
+}
+
+type CHMessage struct {
+	CH int
+}
+
+type SubscribeMsg struct {
+	SenderId int
+}
+
+type EndRoundMessage struct {
 	Round int
 }
 
-func NewBeaconMessage(velocity, posx, posy float64, senderId, degree int) *BeaconMessage {
+func NewBeaconMessage(velocity, posx, posy float64, senderId, degree, round int) *BeaconMessage {
 	return &BeaconMessage{
 		Velocity: velocity,
 		PosX:     posx,
 		PosY:     posy,
 		Degree:   degree,
 		SenderId: senderId,
+		Round:    round,
 	}
 }
 
-func NewPCHMessage(node any, round int) *PCHMessage {
-	return &PCHMessage{
-		Node:  node,
-		Round: round,
+func NewCNNMessage(cnn any, senderId, round int) *CNNMessage {
+	return &CNNMessage{
+		SenderId: senderId,
+		CNN:      cnn,
+		Round:    round,
+	}
+}
+
+func NewSubscribeMessage(senderId int) *SubscribeMsg {
+	return &SubscribeMsg{
+		SenderId: senderId,
 	}
 }

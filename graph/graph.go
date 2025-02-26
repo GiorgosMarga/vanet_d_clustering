@@ -5,82 +5,110 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/GiorgosMarga/vanet_d_clustering/messages"
+	"github.com/GiorgosMarga/vanet_d_clustering/node"
 )
 
-var colors = []string{"red", "blue", "lightblue", "purple", "yellow", "green", "brown", "pink", "black"}
-
-const (
-	a = 0.9
-	b = 0.1
-)
-
-type Node struct {
-	Id           int
-	Neighbors    map[int]*Node
-	Velocity     float64
-	PosX         float64
-	PosY         float64
-	CNN          []*Node
-	PCH          []*Node
-	msgChan      chan *messages.Message
-	neighChans   map[int]chan *messages.Message
-	internalChan chan *messages.BeaconMessage
-	mtx          sync.Mutex
-}
+var colors = []string{"red", "blue", "lightblue", "purple", "yellow", "green", "brown", "pink", "orange", "burlywood", "darkblue"}
 
 type Graph struct {
-	Size       int
-	Nodes      map[int]*Node
-	NumOfNodes int
-	wg         sync.WaitGroup
-	clusters   map[int][]int
+	Nodes            map[int]*node.Node
+	NumOfNodes       int
+	wg               sync.WaitGroup
+	clusters         map[int][]int
+	minClusterNumber int
+	d                int
 }
 
-func NewGraph(size int) *Graph {
+func NewGraph(minClusterNumber, d int) *Graph {
 	return &Graph{
-		Size:     size,
-		Nodes:    make(map[int]*Node),
-		wg:       sync.WaitGroup{},
-		clusters: make(map[int][]int),
-	}
-}
-func NewNode(id int, posx, posy, velocity float64) *Node {
-	return &Node{
-		Id:           id,
-		Neighbors:    make(map[int]*Node),
-		Velocity:     velocity,
-		PosX:         posx,
-		PosY:         posy,
-		CNN:          make([]*Node, 5),
-		PCH:          make([]*Node, 5),
-		msgChan:      make(chan *messages.Message, 1000),
-		neighChans:   make(map[int]chan *messages.Message),
-		internalChan: make(chan *messages.BeaconMessage, 1000),
-		mtx:          sync.Mutex{},
+		Nodes:            make(map[int]*node.Node),
+		wg:               sync.WaitGroup{},
+		clusters:         make(map[int][]int),
+		minClusterNumber: minClusterNumber,
+		d:                d,
 	}
 }
 
-func (g *Graph) AddNode(n *Node) {
+func (g *Graph) ReadFile(path string) error {
+	f, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	sf := string(f)
+
+	splitted := strings.Split(sf, "\n\n")
+	if len(splitted) != 2 {
+		return fmt.Errorf("failed to split file correctly %s", sf)
+	}
+
+	nodes, connections := splitted[0], splitted[1]
+
+	for _, n := range strings.Split(nodes, "\n") {
+		splitted := strings.Split(n, " ")
+		if len(splitted) != 4 {
+			return fmt.Errorf("failed to split nodes correctly %s", n)
+		}
+
+		t := make([]int, 4)
+		var err error
+		for idx := range splitted {
+			t[idx], err = strconv.Atoi(splitted[idx])
+			if err != nil {
+				return err
+			}
+		}
+
+		node := node.NewNode(t[0], float64(t[1]), float64(t[2]), float64(t[3]), fmt.Sprintf("%s_%d", path, t[0]))
+		g.AddNode(node)
+	}
+
+	for _, connection := range strings.Split(connections, "\n") {
+		splitted := strings.Split(connection, "-")
+		if len(splitted) != 2 {
+			return fmt.Errorf("failed to split connections correctly %s", connection)
+		}
+
+		node1, node2 := splitted[0], splitted[1]
+
+		node1Id, err := strconv.Atoi(node1)
+		if err != nil {
+			return err
+		}
+		node2Id, err := strconv.Atoi(node2)
+		if err != nil {
+			return err
+		}
+		n1, n2 := g.Nodes[node1Id], g.Nodes[node2Id]
+		n1.AddNeighbor(n2)
+
+	}
+	return nil
+}
+
+func (g *Graph) AddNode(n *node.Node) {
 	g.NumOfNodes++
 	g.Nodes[n.Id] = n
 }
 func (g *Graph) Print() {
 	for _, cn := range g.Nodes {
 		fmt.Printf("[%d]: ", cn.Id)
-		for _, n := range cn.Neighbors {
-			fmt.Printf("%d ", n.Id)
-		}
+		// for _, n := range cn.Degree() {
+		// 	fmt.Printf("%d ", n.Id)
+		// }
 		fmt.Println("Degree: ", cn.Degree())
 	}
 }
 
-func (g *Graph) PrintCH(d int) {
+func (g *Graph) PrintCH() {
 	for _, cn := range g.Nodes {
-		fmt.Printf("[%d]: CH: %d\n", cn.Id, cn.PCH[d].Id)
+		fmt.Printf("[%d]: CH: %d\n", cn.Id, cn.PCH[g.d].Id)
 	}
 }
 
@@ -91,234 +119,195 @@ func (g *Graph) PrintCHS() {
 	}
 }
 
-func (n *Node) AddNeighbor(neighbor *Node) {
-	n.Neighbors[neighbor.Id] = neighbor
-	n.neighChans[neighbor.Id] = neighbor.msgChan
-	neighbor.Neighbors[n.Id] = n
-	neighbor.neighChans[n.Id] = n.msgChan
-}
-
-func (n *Node) Degree() int {
-	return len(n.Neighbors)
-}
-
-func (g *Graph) DHCV(d int) {
+func (g *Graph) DHCV() {
 	wg := sync.WaitGroup{}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		wg.Wait()
-	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
 	for _, n := range g.Nodes {
 		wg.Add(1)
 		go func() {
-			n.start(ctx)
+			n.Start(ctx, g.d)
 			wg.Done()
 		}()
 	}
-	g.initialization()
-	for i := range d {
-		for _, n := range g.Nodes {
-			g.wg.Add(1)
-			go func() {
-				n.relativeMax(i)
-				g.wg.Done()
-				fmt.Printf("[%d]: Finished Round %d\n", n.Id, i+1)
-			}()
-		}
-		g.wg.Wait()
-	}
 
-	time.Sleep(500 * time.Millisecond)
-	// exception 1
-mainLoop:
 	for _, n := range g.Nodes {
-		ch := n.PCH[d]
-		pathToCH := n.findPath(ch)
-		for _, node := range pathToCH {
-			if node.PCH[d] != ch && ch != node {
-				fmt.Printf("[%d]: passing through %d\n", n.Id, node.PCH[d].Id)
-				// node passes through another cluster
-				for idx := d - 1; idx >= 0; idx-- {
-					pch := n.PCH[idx]
-					if _, ok := n.Neighbors[pch.Id]; ok {
-						n.PCH[d] = pch
-						fmt.Printf("[%d]: Setting new CH %d\n", n.Id, node.Id)
-						continue mainLoop
+		go func() {
+			n.RelativeMax(g.d)
+		}()
+	}
+	wg.Wait()
+
+	g.formClusters()
+	fmt.Println(g.clusters)
+	//exception 1
+	fmt.Println("Exception 1")
+
+	// TODO: refactor this
+mainLoop:
+	for {
+		for i := 1; i < len(g.Nodes); {
+			n := g.Nodes[i]
+			ch := n.PCH[g.d]
+			pathToCH := n.FindPath(ch)
+			// for each node in the path, if the node is a CH then join
+			// the CH might not have select itself as CH
+			for idx := 1; idx < len(pathToCH); idx++ {
+				node := pathToCH[idx]
+				if node.PCH[g.d] != n.PCH[g.d] && node != ch {
+					n.PCH[g.d] = n.PCH[g.d-1]
+					fmt.Printf("[%d]: Passing through %d(%d) -> new CH: %d\n", n.Id, node.Id, node.PCH[g.d].Id, g.Nodes[node.Id].Id)
+
+					i = 0
+					continue mainLoop
+					// if _, ok := g.clusters[node.Id]; ok && node != ch {
+					// n passes through another cluster
+					// if len(n.FindPath(node.PCH[g.d])) <= g.d+1 {
+					// 	fmt.Printf("[%d]: Passing through %d(%d) -> new CH: %d\n", n.Id, node.Id, node.PCH[g.d].Id, g.Nodes[node.Id].Id)
+					// 	// n.PCH[g.d] = node.PCH[g.d]
+					// 	// n.PCH[g.d] = g.Nodes[node.Id]
+					// 	// n.PCH[g.d] = n.PCH[g.d-1]
+
+					// 	i = 0
+					// 	continue mainLoop
+					// }
+				}
+			}
+			i++
+		}
+		break
+	}
+	g.formClusters()
+	fmt.Println(g.clusters)
+
+	fmt.Println("Exception 2")
+	// exception 2
+exceptionLoop:
+	for chId, cluster := range g.clusters {
+		// ch did not select itself as ch
+		ch := g.Nodes[chId]
+		if !slices.Contains(cluster, chId) {
+			newCh := ch.PCH[g.d]
+			for _, n := range cluster {
+				currNode := g.Nodes[n]
+				if len(currNode.FindPath(newCh)) >= g.d+1 {
+					// there is a node in the cluster that cant satisfy distance
+					// in this case nodes form a cluster
+					fmt.Printf("Exception2: [%d] can't satisfy distance with %d\n", currNode.Id, newCh.Id)
+					ch.PCH[g.d] = ch
+					g.formClusters()
+					continue exceptionLoop
+				}
+			}
+			// CMs join the new cluster
+			fmt.Printf("[%d]: CH did not select itself as PCH (%d)\n", chId, ch.PCH[g.d].Id)
+			for _, cm := range cluster {
+				n := g.Nodes[cm]
+				n.PCH[g.d] = ch.PCH[g.d]
+			}
+			delete(g.clusters, chId)
+		}
+	}
+	g.formClusters()
+	fmt.Println(g.clusters)
+	fmt.Println("Exception 3")
+	// exception 3
+exception3Loop:
+	for _, cluster := range g.clusters {
+		if len(cluster) == 1 {
+			// CH with no CMs
+			n := g.Nodes[cluster[0]]
+			for i := g.d - 1; i >= 0; i-- {
+				potentialCH := n.CNN[i].PCH[g.d]
+				if len(n.FindPath(potentialCH)) <= g.d+1 {
+					n.PCH[g.d] = potentialCH
+					fmt.Printf("[%d]: CH node without CMs -> New CH %d\n", n.Id, n.PCH[g.d].PCH[g.d].Id)
+					// find new pch's cluster and add new member
+					pch := n.PCH[g.d].PCH[g.d].Id
+					g.clusters[pch] = append(g.clusters[pch], n.Id)
+					continue exception3Loop
+				}
+			}
+			fmt.Printf("[%d]: CH node without CMs -> Can't satisfy distance d\n", n.Id)
+		}
+	}
+	g.formClusters()
+	fmt.Println(g.clusters)
+	fmt.Println("Merge clusters")
+	// merge clusters
+mergeLoop:
+	for ch, cluster := range g.clusters {
+		if len(cluster) <= g.minClusterNumber {
+			currCh := g.Nodes[ch]
+			fmt.Printf("Found cluster with min members: %d\n", ch)
+			bestCh := math.MaxFloat64
+			var bestChNode *node.Node
+			// TODO: search neighbor to d to find CHs
+			// checks all CHs that have distance <= d and calculates the relative mobility
+			for newCh := range g.clusters {
+				if ch != newCh {
+					chNode := g.Nodes[newCh]
+					pathTo := g.Nodes[ch].FindPath(chNode)
+					if len(pathTo) <= g.d+1 {
+						fmt.Printf("Comparing %d->%d\n", ch, newCh)
+						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree())
+						if mob < bestCh {
+							bestCh = mob
+							bestChNode = chNode
+						}
 					}
 				}
-				fmt.Printf("[%d]: Didn't find a better CH\n", n.Id)
-				n.PCH[d] = node.PCH[d]
-				break
+			}
+			// if there is a better ch node, then if all CMs are in distance <= d, merge else keep cluster
+			if bestChNode != nil {
+				for _, nodeId := range cluster {
+					currNode := g.Nodes[nodeId]
+					if currNode != currCh {
+						p := currNode.FindPath(bestChNode) // TODO: findPath includes the curr node as well
+						if len(p) > g.d+1 {
+							// one cluster member cant join new cluster because of distance, cluster remains
+							continue mergeLoop
+						}
+					}
+				}
+				for idx := range cluster {
+					fmt.Printf("[%d]: New cm %d\n", bestChNode.Id, cluster[idx])
+					g.Nodes[cluster[idx]].PCH[g.d] = bestChNode
+					if _, ok := g.clusters[bestChNode.Id]; ok {
+						g.clusters[bestChNode.Id] = append(g.clusters[bestChNode.Id], cluster[idx])
+					}
+				}
+				delete(g.clusters, currCh.Id)
 			}
 		}
 	}
+	g.formClusters()
+	fmt.Println(g.clusters)
+
+}
+
+func (g *Graph) formClusters() {
+	g.clusters = make(map[int][]int)
+
 	for _, n := range g.Nodes {
-		ch := n.PCH[d]
+		ch := n.PCH[g.d]
 		if _, ok := g.clusters[ch.Id]; !ok {
 			g.clusters[ch.Id] = make([]int, 0)
 		}
 		g.clusters[ch.Id] = append(g.clusters[ch.Id], n.Id)
 	}
-
-	fmt.Println(g.clusters)
-}
-func (n *Node) isCH(d int) bool {
-	return n.PCH[d].Id == n.Id
-}
-func (g *Graph) initialization() {
-	for _, cn := range g.Nodes {
-		cn.CNN[0] = cn
-		cn.PCH[0] = cn
-	}
 }
 
-func (n *Node) GetdHopNeighs(d int) map[int]*Node {
-	visited := make(map[int]struct{})
-	q := make([]*Node, 1)
-	q[0] = n
-	visited[n.Id] = struct{}{}
-	for i := 0; i < d; i++ {
-		for _, cn := range q {
-			q = q[1:]
-			for _, nn := range cn.Neighbors {
-				if _, ok := visited[nn.Id]; ok {
-					continue
-				}
-				visited[nn.Id] = struct{}{}
-				q = append(q, nn)
-			}
-		}
-	}
-	neighs := make(map[int]*Node)
-	for _, cn := range q {
-		neighs[cn.Id] = cn
-	}
-	return neighs
-}
+// func (g *Graph) initialization() {
+// 	for _, cn := range g.Nodes {
+// 		cn.f.WriteString(fmt.Sprintf("CNN[0]=%d\tPCH[0]=%d\n", cn.Id, cn.Id))
+// 		cn.CNN[0] = cn
+// 		cn.PCH[0] = cn
+// 	}
+// }
 
-func (n *Node) bcast(msg *messages.Message) {
-	for _, cn := range n.Neighbors {
-		timer := time.NewTimer(500 * time.Millisecond)
-		select {
-		case n.neighChans[cn.Id] <- msg:
-			continue
-		case <-timer.C:
-			fmt.Printf("[%d]: Failed to send message (bcast) to: (%d)\n", n.Id, cn.Id)
-			timer.Stop()
-		}
-	}
-}
-func (n *Node) relativeMax(i int) {
-	n.mtx.Lock()
-	defer n.mtx.Unlock()
-	idx := i + 1
-	// fmt.Printf("[%d]: Round %d\n", n.Id, idx)
-	neighs := n.GetdHopNeighs(idx)
-	for nodeId := range neighs {
-		msg := messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, messages.NewBeaconMessage(n.Velocity, n.PosX, n.PosY, n.Id, n.Degree()))
-		// check if its neighbor else bcast the message
-		if c, ok := n.neighChans[nodeId]; ok {
-			c <- msg
-		} else {
-			n.bcast(msg)
-		}
-	}
-	// fmt.Printf("[%d]: Sent all beacon messages\n", n.Id)
-	minMobility := math.MaxFloat64
-	var CNN int
-	messagesReceived := make(map[int]struct{})
-	for len(messagesReceived) < len(neighs) {
-
-		msg := <-n.internalChan
-		if _, ok := messagesReceived[msg.SenderId]; ok {
-			continue
-		}
-		relativeSpeed := n.CNN[i].getRelativeSpeedPos(msg.Velocity, msg.PosX, msg.PosY)
-		if relativeSpeed < minMobility || (relativeSpeed == minMobility && n.CNN[i].Degree() < msg.Degree) {
-			minMobility = relativeSpeed
-			CNN = msg.SenderId
-		}
-		messagesReceived[msg.SenderId] = struct{}{}
-	}
-	cnnNode := neighs[CNN]
-	n.CNN[idx] = cnnNode
-	if cnnNode.Degree() > n.PCH[i].Degree() {
-		n.PCH[idx] = cnnNode
-	} else {
-		n.PCH[idx] = n.PCH[i]
-	}
-
-	if n.CNN[idx].Degree() == n.CNN[idx-1].Degree() && n.CNN[idx].Velocity < n.CNN[idx-1].Velocity {
-		msg := messages.NewMessage(n.Id, n.CNN[idx-1].Id, messages.DefaultTTL, messages.NewPCHMessage(n.CNN[idx], idx))
-		n.sendMsg(msg)
-	}
-}
-
-func (n *Node) sendMsg(msg *messages.Message) {
-	if c, ok := n.neighChans[msg.To]; ok {
-		timer := time.NewTimer(500 * time.Millisecond)
-		select {
-		case c <- msg:
-			break
-		case <-timer.C:
-			fmt.Printf("[%d]: Failed to send message to: (%d)\n", n.Id, msg.To)
-			timer.Stop()
-		}
-		return
-	}
-	n.bcast(msg)
-}
-
-func (n *Node) start(ctx context.Context) {
-	messagesReceived := make(map[int]struct{})
-	for {
-		select {
-		case m := <-n.msgChan:
-			if _, ok := messagesReceived[m.ID]; ok {
-				continue
-			}
-			messagesReceived[m.ID] = struct{}{}
-			if m.Ttl <= 0 {
-				continue
-			}
-			if m.To != n.Id {
-				newMsg := *m
-				newMsg.Ttl -= 1
-				n.bcast(&newMsg)
-				continue
-			}
-			switch m.Msg.(type) {
-			case *messages.BeaconMessage:
-				n.internalChan <- m.Msg.(*messages.BeaconMessage)
-			case *messages.PCHMessage:
-				go n.handlePCHMessage(m.Msg.(*messages.PCHMessage))
-			}
-		case <-ctx.Done():
-			// fmt.Printf("[%d]: Terminating...\n", n.Id)
-			return
-		}
-	}
-}
-
-func (n *Node) handlePCHMessage(msg *messages.PCHMessage) {
-	n.mtx.Lock()
-	defer n.mtx.Unlock()
-	if msg.Node.(*Node).Degree() > n.PCH[msg.Round].Degree() {
-		fmt.Printf("[%d]: Setting new pch %d\n", n.Id, msg.Node.(*Node).Id)
-		n.PCH[msg.Round] = msg.Node.(*Node)
-	}
-}
-
-func (n *Node) getRelativeSpeedPos(vel float64, x, y float64) float64 {
-	dx := math.Pow(n.PosX-x, 2)
-	dy := math.Pow(n.PosY-y, 2)
-	dxy := math.Sqrt(dx + dy)
-	return a*dxy + b*math.Abs(n.Velocity-vel)
-
-}
-
-func (g *Graph) PlotGraph(filename string) error {
+func (g *Graph) PlotGraph(filename string, d int) error {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -329,13 +318,13 @@ func (g *Graph) PlotGraph(filename string) error {
 	f.WriteString("graph RandomGraph {\n\tgraph [layout=neato, splines=true, overlap=false];\n\n")
 
 	for _, n := range g.Nodes {
-		ch := n.PCH[3]
+		ch := n.PCH[d]
 		color := colors[ch.Id%len(colors)]
 		f.WriteString(fmt.Sprintf("\t%d [pos=\"%f,%f!\" fillcolor=\"%s\" style=\"filled\" label=\"%d,%.2f\"];\n", n.Id, n.PosX, n.PosY, color, n.Id, n.Velocity))
 	}
 
 	for _, n := range g.Nodes {
-		for _, neighbor := range n.Neighbors {
+		for _, neighbor := range n.DHopNeighbors[1] {
 			if neighbor.Id > n.Id {
 				f.WriteString(fmt.Sprintf("\t%d -- %d;\n", n.Id, neighbor.Id))
 			}
@@ -346,54 +335,12 @@ func (g *Graph) PlotGraph(filename string) error {
 	return nil
 }
 
-func (n *Node) findPath(tNode *Node) []*Node {
-	type state struct {
-		node *Node
-		path []*Node
-	}
-	visited := make(map[int]struct{})
-	q := make([]state, 1)
-	q[0] = state{
-		node: n,
-		path: []*Node{n},
-	}
-	for len(q) > 0 {
-		cState := q[0]
-		if cState.node.Id == tNode.Id {
-			return cState.path
-		}
-		visited[cState.node.Id] = struct{}{}
-		q = q[1:]
-		for _, n := range cState.node.Neighbors {
-			if _, ok := visited[n.Id]; ok {
-				continue
-			}
-			newPath := make([]*Node, len(cState.path))
-			copy(newPath, cState.path)
-			newPath = append(newPath, n)
-			newState := state{
-				node: n,
-				path: newPath,
-			}
-			q = append(q, newState)
-		}
-	}
-	return []*Node{}
-}
-
-func (g *Graph) getClusterMembers(n *Node, d int) []*Node {
-	cms := make([]*Node, 0)
-	for _, node := range g.Nodes {
-		if node.PCH[d] == n.PCH[d] && node != n {
-			cms = append(cms, node)
-		}
-	}
-	return cms
-}
-
-func printPath(path []*Node) {
-	for _, n := range path {
-		fmt.Printf("%d ", n.Id)
-	}
-	fmt.Println()
-}
+// func (g *Graph) getClusterMembers(n *node.Node, d int) []*node.Node {
+// 	cms := make([]*node.Node, 0)
+// 	for _, node.Node := range g.Nodes {
+// 		if node.Node.PCH[d] == n.PCH[d] && node.Node != n {
+// 			cms = append(cms, node.Node)
+// 		}
+// 	}
+// 	return cms
+// }
