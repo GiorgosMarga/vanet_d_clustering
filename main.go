@@ -29,4 +29,5 @@ func main() {
 	if err := g.PlotGraph("test.dot", d); err != nil {
 		log.Fatal(err)
 	}
+
 }
