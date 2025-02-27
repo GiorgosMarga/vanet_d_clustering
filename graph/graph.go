@@ -99,9 +99,6 @@ func (g *Graph) AddNode(n *node.Node) {
 func (g *Graph) Print() {
 	for _, cn := range g.Nodes {
 		fmt.Printf("[%d]: ", cn.Id)
-		// for _, n := range cn.Degree() {
-		// 	fmt.Printf("%d ", n.Id)
-		// }
 		fmt.Println("Degree: ", cn.Degree())
 	}
 }
@@ -131,20 +128,17 @@ func (g *Graph) DHCV() {
 			wg.Done()
 		}()
 	}
-	g.initialization()
-	for i := range d {
-		for _, n := range g.Nodes {
-			g.wg.Add(1)
-			go func() {
-				n.relativeMax(i)
-				g.wg.Done()
-				fmt.Printf("[%d]: Finished Round %d\n", n.Id, i+1)
-			}()
-		}
-		g.wg.Wait()
-	}
 
-	time.Sleep(500 * time.Millisecond)
+	for _, n := range g.Nodes {
+		go func() {
+			n.RelativeMax(g.d)
+		}()
+	}
+	wg.Wait()
+
+	g.formClusters()
+	fmt.Println(g.clusters)
+
 	// exception 1
 mainLoop:
 	for {
@@ -154,8 +148,7 @@ mainLoop:
 			pathToCH := n.FindPath(ch)
 			// for each node in the path, if the node is a CH then join
 			// the CH might not have select itself as CH
-			for idx := 1; idx < len(pathToCH); idx++ {
-				node := pathToCH[idx]
+			for _, node := range pathToCH {
 				if node.PCH[g.d] != n.PCH[g.d] && node != ch {
 					n.PCH[g.d] = n.PCH[g.d-1]
 					fmt.Printf("[%d]: Passing through %d(%d) -> new CH: %d\n", n.Id, node.Id, node.PCH[g.d].Id, g.Nodes[node.Id].Id)
@@ -192,7 +185,7 @@ exceptionLoop:
 			newCh := ch.PCH[g.d]
 			for _, n := range cluster {
 				currNode := g.Nodes[n]
-				if len(currNode.FindPath(newCh)) >= g.d+1 {
+				if len(currNode.FindPath(newCh)) >= g.d {
 					// there is a node in the cluster that cant satisfy distance
 					// in this case nodes form a cluster
 					fmt.Printf("Exception2: [%d] can't satisfy distance with %d\n", currNode.Id, newCh.Id)
@@ -221,7 +214,7 @@ exception3Loop:
 			n := g.Nodes[cluster[0]]
 			for i := g.d - 1; i >= 0; i-- {
 				potentialCH := n.CNN[i].PCH[g.d]
-				if len(n.FindPath(potentialCH)) <= g.d+1 {
+				if len(n.FindPath(potentialCH)) <= g.d {
 					n.PCH[g.d] = potentialCH
 					fmt.Printf("[%d]: CH node without CMs -> New CH %d\n", n.Id, n.PCH[g.d].PCH[g.d].Id)
 					// find new pch's cluster and add new member
@@ -250,7 +243,7 @@ mergeLoop:
 				if ch != newCh {
 					chNode := g.Nodes[newCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
-					if len(pathTo) <= g.d+1 {
+					if len(pathTo) <= g.d {
 						fmt.Printf("Comparing %d->%d\n", ch, newCh)
 						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree())
 						if mob < bestCh {
@@ -265,8 +258,8 @@ mergeLoop:
 				for _, nodeId := range cluster {
 					currNode := g.Nodes[nodeId]
 					if currNode != currCh {
-						p := currNode.FindPath(bestChNode) // TODO: findPath includes the curr node as well
-						if len(p) > g.d+1 {
+						p := currNode.FindPath(bestChNode)
+						if len(p) > g.d {
 							// one cluster member cant join new cluster because of distance, cluster remains
 							continue mergeLoop
 						}
@@ -300,14 +293,6 @@ func (g *Graph) formClusters() {
 	}
 }
 
-// func (g *Graph) initialization() {
-// 	for _, cn := range g.Nodes {
-// 		cn.f.WriteString(fmt.Sprintf("CNN[0]=%d\tPCH[0]=%d\n", cn.Id, cn.Id))
-// 		cn.CNN[0] = cn
-// 		cn.PCH[0] = cn
-// 	}
-// }
-
 func (g *Graph) PlotGraph(filename string, d int) error {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
@@ -335,13 +320,3 @@ func (g *Graph) PlotGraph(filename string, d int) error {
 	f.WriteString("}")
 	return nil
 }
-
-// func (g *Graph) getClusterMembers(n *node.Node, d int) []*node.Node {
-// 	cms := make([]*node.Node, 0)
-// 	for _, node.Node := range g.Nodes {
-// 		if node.Node.PCH[d] == n.PCH[d] && node.Node != n {
-// 			cms = append(cms, node.Node)
-// 		}
-// 	}
-// 	return cms
-// }

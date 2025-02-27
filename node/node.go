@@ -245,7 +245,6 @@ func (n *Node) Start(ctx context.Context, d int) {
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
 			fmt.Printf("[%d]: Terminating...\n", n.Id)
-			// close(n.msgChan)
 			return
 		default:
 			time.Sleep(10 * time.Millisecond)
@@ -283,7 +282,7 @@ func (n *Node) RelativeMax(d int) {
 	n.CNN[0] = n
 	n.PCH[0] = n
 
-	// In the first round, each node finds the CNN based on it's neighbor.
+	// In the first round, each node finds the CNN based on it's neighborhood.
 	// n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 	fmt.Printf("[%d]: Starting round: %d\n", n.Id, n.round)
 	msgs := make(map[*messages.BeaconMessage]struct{})
@@ -381,7 +380,7 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 	for len(q) > 0 {
 		cState := q[0]
 		if cState.node.Id == tNode.Id {
-			return cState.path
+			return cState.path[1:]
 		}
 		visited[cState.node.Id] = struct{}{}
 		q = q[1:]
@@ -409,26 +408,3 @@ func printPath(path []*Node) string {
 	return s + "\n"
 }
 
-func (n *Node) searchNeighborhood(d int) {
-	for n.round = 2; n.round <= d; n.round++ {
-		n.f.WriteString(fmt.Sprintf("Starting round: %d (searching neighborhood)\n", n.round))
-		neighborhood := n.GetdHopNeighs(n.round)
-		minRelativeMob := math.MaxFloat64
-		for _, neighbor := range neighborhood {
-			relativeMobility := n.GetRelativeMobility(neighbor.Velocity, neighbor.PosX, neighbor.PosY, neighbor.Degree())
-			if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[1].Degree() < neighbor.Degree()) {
-				n.CNN[n.round] = neighbor
-				minRelativeMob = relativeMobility
-			}
-
-		}
-		cnn := n.CNN[n.round]
-		if cnn.Degree() > n.PCH[n.round-1].Degree() || (cnn.Degree() == n.PCH[n.round-1].Degree() && cnn.Velocity < n.PCH[n.round-1].Velocity) {
-			n.PCH[n.round] = cnn
-		} else {
-			n.PCH[n.round] = n.PCH[n.round-1]
-		}
-		n.f.WriteString(fmt.Sprintf("CNN: %d\tPCH: %d\n", n.CNN[n.round].Id, n.PCH[n.round].Id))
-		fmt.Printf("[%d]: CNN: %d\tPCH: %d\n", n.Id, n.CNN[n.round].Id, n.PCH[n.round].Id)
-	}
-}
