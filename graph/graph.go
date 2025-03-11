@@ -35,42 +35,42 @@ func NewGraph(minClusterNumber, d int) *Graph {
 	}
 }
 
-func (g *Graph) ReadFile(path string) error {
+func (g *Graph) ReadFile(path string, splitter string) error {
 	f, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
 	sf := string(f)
-
-	splitted := strings.Split(sf, "\n\n")
+	sf = strings.Replace(sf, "\r\n", "\n", -1)
+	splitted := strings.Split(sf, splitter)
 	if len(splitted) != 2 {
-		return fmt.Errorf("failed to split file correctly %s", sf)
+		return fmt.Errorf("failed to split file correctly (%s)", path)
 	}
 
-	nodes, connections := splitted[0], splitted[1]
-
+	nodes, connections := string(splitted[0]), string(splitted[1])
 	for _, n := range strings.Split(nodes, "\n") {
-		splitted := strings.Split(n, " ")
+		splitted := strings.Split(strings.TrimSpace(n), " ")
 		if len(splitted) != 4 {
-			return fmt.Errorf("failed to split nodes correctly %s", n)
+			return fmt.Errorf("failed to split nodes correctly (%s)", path)
 		}
 
-		t := make([]int, 4)
+		t := make([]float64, 4)
 		var err error
 		for idx := range splitted {
-			t[idx], err = strconv.Atoi(splitted[idx])
+			t[idx], err = strconv.ParseFloat(splitted[idx], 64)
 			if err != nil {
 				return err
 			}
 		}
 
-		node := node.NewNode(t[0], float64(t[1]), float64(t[2]), float64(t[3]), fmt.Sprintf("%s_%d", path, t[0]))
+		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], fmt.Sprintf("./cars_info/%s_%d", path, int(t[0])))
 		g.AddNode(node)
 	}
 
 	for _, connection := range strings.Split(connections, "\n") {
-		splitted := strings.Split(connection, "-")
+		fmt.Println(connection)
+		splitted := strings.Split(strings.TrimSpace(connection), "-")
 		if len(splitted) != 2 {
 			return fmt.Errorf("failed to split connections correctly %s", connection)
 		}
@@ -116,10 +116,34 @@ func (g *Graph) PrintCHS() {
 	}
 }
 
+func (g *Graph) GenerateSUMOFile(filename string) error {
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	for chId, cluster := range g.clusters {
+		ln := fmt.Sprintf("%d %s ", chId, colors[chId%len(colors)])
+		for idx := range cluster {
+			if idx == len(cluster)-1 {
+				ln += fmt.Sprintf("%d", cluster[idx])
+			} else {
+				ln += fmt.Sprintf("%d,", cluster[idx])
+			}
+		}
+		f.WriteString(ln)
+		f.WriteString("\n")
+	}
+	return nil
+}
+
 func (g *Graph) DHCV() {
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
+
+	for _, n := range g.Nodes {
+		go n.Beacon(ctx)
+	}
 
 	for _, n := range g.Nodes {
 		wg.Add(1)
@@ -130,20 +154,25 @@ func (g *Graph) DHCV() {
 	}
 
 	for _, n := range g.Nodes {
-		go func() {
-			n.RelativeMax(g.d)
-		}()
+		go n.RelativeMax(g.d)
 	}
 	wg.Wait()
 
 	g.formClusters()
 	fmt.Println(g.clusters)
 
+	for _, n := range g.Nodes {
+		wg.Add(1)
+		go func() {
+			n.Exceptions(g.d)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 	// exception 1
 mainLoop:
 	for {
-		for i := 1; i < len(g.Nodes); {
-			n := g.Nodes[i]
+		for _, n := range g.Nodes {
 			ch := n.PCH[g.d]
 			pathToCH := n.FindPath(ch)
 			// for each node in the path, if the node is a CH then join
@@ -152,8 +181,6 @@ mainLoop:
 				if node.PCH[g.d] != n.PCH[g.d] && node != ch {
 					n.PCH[g.d] = n.PCH[g.d-1]
 					fmt.Printf("[%d]: Passing through %d(%d) -> new CH: %d\n", n.Id, node.Id, node.PCH[g.d].Id, g.Nodes[node.Id].Id)
-
-					i = 0
 					continue mainLoop
 					// if _, ok := g.clusters[node.Id]; ok && node != ch {
 					// n passes through another cluster
@@ -168,7 +195,6 @@ mainLoop:
 					// }
 				}
 			}
-			i++
 		}
 		break
 	}
@@ -243,9 +269,9 @@ mergeLoop:
 				if ch != newCh {
 					chNode := g.Nodes[newCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
-					if len(pathTo) <= g.d {
-						fmt.Printf("Comparing %d->%d\n", ch, newCh)
+					if len(pathTo) <= g.d && len(pathTo) > 0 {
 						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree())
+						fmt.Printf("Comparing %d->%d %f\n", ch, newCh, mob)
 						if mob < bestCh {
 							bestCh = mob
 							bestChNode = chNode
@@ -253,13 +279,17 @@ mergeLoop:
 					}
 				}
 			}
+
 			// if there is a better ch node, then if all CMs are in distance <= d, merge else keep cluster
 			if bestChNode != nil {
+
 				for _, nodeId := range cluster {
 					currNode := g.Nodes[nodeId]
 					if currNode != currCh {
 						p := currNode.FindPath(bestChNode)
+						node.PrintPath(p)
 						if len(p) > g.d {
+							fmt.Printf("[%d]: can't satisfy d\n", currNode.Id)
 							// one cluster member cant join new cluster because of distance, cluster remains
 							continue mergeLoop
 						}
