@@ -37,25 +37,27 @@ type Node struct {
 	subscribers   map[int]struct{}
 }
 
-func NewNode(id int, posx, posy, velocity float64, filename string) *Node {
+func NewNode(id, d int, posx, posy, velocity float64, filename string) *Node {
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
+	dhop := make(map[int]map[int]*Node)
+	dhop[1] = make(map[int]*Node)
 	return &Node{
 		Id:            id,
 		Velocity:      velocity,
 		PosX:          posx,
 		PosY:          posy,
-		CNN:           make([]*Node, 5),
-		PCH:           make([]*Node, 5),
+		CNN:           make([]*Node, d+1),
+		PCH:           make([]*Node, d+1),
 		msgChan:       make(chan *messages.Message, 1000), //TODO: change this
 		internalChan:  make(chan any, 1000),
-		round:         0,
+		round:         1,
 		mtx:           &sync.Mutex{},
 		finishChan:    make(chan struct{}),
 		f:             f,
-		DHopNeighbors: make(map[int]map[int]*Node), // TODO: I dont need to know all the graph, only the 1-hop neighbors
+		DHopNeighbors: dhop, // TODO: I dont need to know all the graph, only the 1-hop neighbors
 		subscribers:   make(map[int]struct{}),
 	}
 }
@@ -92,9 +94,6 @@ func (n *Node) printPCH(d int) {
 }
 
 func (n *Node) AddNeighbor(neighbor *Node) {
-	if len(n.DHopNeighbors[1]) == 0 {
-		n.DHopNeighbors[1] = make(map[int]*Node)
-	}
 	if len(neighbor.DHopNeighbors[1]) == 0 {
 		neighbor.DHopNeighbors[1] = make(map[int]*Node)
 	}
@@ -163,37 +162,59 @@ func (n *Node) sendMsg(msg *messages.Message) {
 	n.bcast(msg)
 }
 
-// beacon sends a beacon message to all neighbors.
-func (n *Node) beacon(ctx context.Context) {
+func (n *Node) sendBeacons() {
+	for _, ne := range n.DHopNeighbors[1] {
+		msg := messages.NewMessage(n.Id, ne.Id, messages.DefaultTTL, &messages.BeaconMessage{
+			Velocity: n.Velocity,
+			PosX:     n.PosX,
+			PosY:     n.PosY,
+			SenderId: n.Id,
+			Round:    1,
+		})
+		n.sendMsg(msg)
+	}
+}
+func (n *Node) advertiseCNN() {
+	for subId := range n.subscribers {
+		for round, cnn := range n.CNN {
+			if cnn == nil {
+				break
+			}
+			msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.CNNMessage{
+				SenderId: n.Id,
+				Round:    round + 1,
+				CNN:      n.CNN[round],
+			})
+			n.sendMsg(msg)
+		}
+	}
+}
+
+func (n *Node) advertiseCluster() {
+	d := len(n.PCH) - 1
+	if n.PCH[d] == nil {
+		return
+	}
+	for subId := range n.DHopNeighbors[1] {
+		msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.ClusterMessage{
+			Sender:    n.Id,
+			ClusterId: n.PCH[d].Id,
+			IsCh:      n.isCH(d),
+		})
+		n.sendMsg(msg)
+	}
+}
+
+// Beacon sends a beacon message to all neighbors.
+func (n *Node) Beacon(ctx context.Context) {
 	t := time.NewTicker(100 * time.Millisecond)
 	defer t.Stop()
 	for {
 		select {
 		case <-t.C:
-			for _, ne := range n.DHopNeighbors[1] {
-				msg := messages.NewMessage(n.Id, ne.Id, messages.DefaultTTL, &messages.BeaconMessage{
-					Velocity: n.Velocity,
-					PosX:     n.PosX,
-					PosY:     n.PosY,
-					SenderId: n.Id,
-					Round:    1,
-				})
-				n.sendMsg(msg)
-			}
-
-			for subId := range n.subscribers {
-				for round, cnn := range n.CNN {
-					if cnn == nil {
-						break
-					}
-					msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.CNNMessage{
-						SenderId: n.Id,
-						Round:    round + 1,
-						CNN:      n.CNN[round],
-					})
-					n.sendMsg(msg)
-				}
-			}
+			n.sendBeacons()
+			n.advertiseCNN()
+			n.advertiseCluster()
 		case <-ctx.Done():
 			fmt.Printf("[%d]: Done sending messages\n", n.Id)
 			return
@@ -209,9 +230,6 @@ func (n *Node) Start(ctx context.Context, d int) {
 	// initialization
 	n.CNN[0] = n
 	n.PCH[0] = n
-	n.round = 1
-
-	go n.beacon(ctx)
 
 	for {
 		select {
@@ -238,7 +256,6 @@ func (n *Node) Start(ctx context.Context, d int) {
 				}
 			case *messages.SubscribeMsg:
 				senderId := m.Msg.(*messages.SubscribeMsg).SenderId
-
 				n.subscribers[senderId] = struct{}{}
 				continue
 			}
@@ -253,34 +270,51 @@ func (n *Node) Start(ctx context.Context, d int) {
 }
 
 // exceptions are not used for now.
-func (n *Node) exceptions(d int) {
-	cms := make([]*Node, 0)
-	if n.isCH(d) {
-		for i := 1; i <= d; i++ {
-			for _, n := range n.DHopNeighbors[i] {
-				if n.PCH[d] == n {
-					cms = append(cms, n)
-				}
-			}
-		}
-		if len(cms) == 0 || len(cms) == 1 {
-			fmt.Println("CMS is 0", cms)
-		}
-		return
+func (n *Node) Exceptions(d int) {
+	var (
+		clusterMsg = messages.NewClusterMessage(n.PCH[d].Id, n.Id, n.isCH(d))
+		clusters   = make(map[int][]int)
+	)
+	for _, neighbor := range n.DHopNeighbors[1] {
+		msg := messages.NewMessage(n.Id, neighbor.Id, messages.DefaultTTL, clusterMsg)
+		n.sendMsg(msg)
 	}
 
-	potentialCh := n.PCH[d]
-	pathToCh := n.FindPath(potentialCh)
+	for range len(n.DHopNeighbors[1]) {
+		message := <-n.internalChan
+		chMsg, ok := message.(*messages.ClusterMessage)
+		if !ok {
+			// fmt.Printf("[%d]: Received invalid message: %+v. Expected ClusterMessage\n", n.Id, message)
+			continue
+		}
 
-	for i := 1; i < len(pathToCh); i++ {
-		node := pathToCh[i]
-		_ = node
+		if chMsg.IsCh {
+			clusters[chMsg.ClusterId] = make([]int, 0)
+		}
+		clusters[chMsg.ClusterId] = append(clusters[chMsg.ClusterId], chMsg.Sender)
 	}
+	if _, ok := clusters[n.PCH[d].Id]; !ok {
+		clusters[n.PCH[d].Id] = make([]int, 0)
+	}
+	clusters[n.PCH[d].Id] = append(clusters[n.PCH[d].Id], n.Id)
+	// fmt.Printf("[%d]: ", n.Id)
+	// fmt.Println(clusters)
+	// close(n.finishChan)
 
 }
 func (n *Node) RelativeMax(d int) {
 	n.CNN[0] = n
 	n.PCH[0] = n
+
+	if len(n.DHopNeighbors[1]) == 0 {
+		// node has no neighbors
+		for i := 1; i <= d; i++ {
+			n.CNN[i] = n
+			n.PCH[i] = n
+		}
+
+		return
+	}
 
 	// In the first round, each node finds the CNN based on it's neighborhood.
 	// n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
@@ -302,6 +336,10 @@ func (n *Node) RelativeMax(d int) {
 	minRelativeMob := math.MaxFloat64
 	for msg := range msgs {
 		cnn := n.DHopNeighbors[1][msg.SenderId]
+		if cnn == nil {
+			fmt.Printf("[%d] cnn is nil\n", n.Id)
+			log.Fatal()
+		}
 		relativeMobility := n.CNN[n.round-1].GetRelativeMobility(msg.Velocity, msg.PosX, msg.PosY, cnn.Degree())
 		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[n.round-1].Id, msg.SenderId, relativeMobility))
 		fmt.Printf("[%d]: Comparing CNN: %d with %d (%f)\n", n.Id, n.CNN[n.round-1].Id, msg.SenderId, relativeMobility)
@@ -407,4 +445,3 @@ func printPath(path []*Node) string {
 	}
 	return s + "\n"
 }
-

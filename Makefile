@@ -5,7 +5,9 @@ graph:
 	dot -Tpng test.dot -o output.png
 
 clean:
-	rm -rf *.info
-	rm -rf *.graph_*
+	rm -rf *.png
+	rm -rf ./sumo/*
+	rm -rf ./graphviz/*
+	rm -rf ./cars_info/snapshots/*
 
 .PHONY: graph

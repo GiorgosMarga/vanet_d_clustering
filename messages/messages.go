@@ -57,6 +57,19 @@ type EndRoundMessage struct {
 	Round int
 }
 
+type ClusterMessage struct {
+	ClusterId int
+	IsCh      bool
+	Sender    int
+}
+
+func NewClusterMessage(clusterId, sender int, isCh bool) *ClusterMessage {
+	return &ClusterMessage{
+		ClusterId: clusterId,
+		IsCh:      isCh,
+		Sender:    sender,
+	}
+}
 func NewBeaconMessage(velocity, posx, posy float64, senderId, degree, round int) *BeaconMessage {
 	return &BeaconMessage{
 		Velocity: velocity,
