@@ -154,7 +154,7 @@ func (n *Node) sendMsg(msg *messages.Message) {
 		case c.msgChan <- msg:
 			break
 		case <-timer.C:
-			fmt.Printf("[%d]: Failed to send message to: (%d)\n", n.Id, msg.To)
+			n.f.WriteString(fmt.Sprintf("[%d]: Failed to send message to: (%d)\n", n.Id, msg.To))
 			timer.Stop()
 		}
 		return
@@ -216,7 +216,7 @@ func (n *Node) Beacon(ctx context.Context) {
 			n.advertiseCNN()
 			n.advertiseCluster()
 		case <-ctx.Done():
-			fmt.Printf("[%d]: Done sending messages\n", n.Id)
+			n.f.WriteString(fmt.Sprintf("[%d]: Done sending messages\n", n.Id))
 			return
 		}
 
@@ -261,7 +261,7 @@ func (n *Node) Start(ctx context.Context, d int) {
 			}
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
-			fmt.Printf("[%d]: Terminating...\n", n.Id)
+			n.f.WriteString(fmt.Sprintf("[%d]: Terminating...\n", n.Id))
 			return
 		default:
 			time.Sleep(10 * time.Millisecond)
@@ -297,9 +297,6 @@ func (n *Node) Exceptions(d int) {
 		clusters[n.PCH[d].Id] = make([]int, 0)
 	}
 	clusters[n.PCH[d].Id] = append(clusters[n.PCH[d].Id], n.Id)
-	// fmt.Printf("[%d]: ", n.Id)
-	// fmt.Println(clusters)
-	// close(n.finishChan)
 
 }
 func (n *Node) RelativeMax(d int) {
@@ -317,8 +314,8 @@ func (n *Node) RelativeMax(d int) {
 	}
 
 	// In the first round, each node finds the CNN based on it's neighborhood.
-	// n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
-	fmt.Printf("[%d]: Starting round: %d\n", n.Id, n.round)
+	n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
+	// fmt.Printf("[%d]: Starting round: %d\n", n.Id, n.round)
 	msgs := make(map[*messages.BeaconMessage]struct{})
 
 	for len(msgs) < len(n.DHopNeighbors[1]) {
@@ -336,13 +333,9 @@ func (n *Node) RelativeMax(d int) {
 	minRelativeMob := math.MaxFloat64
 	for msg := range msgs {
 		cnn := n.DHopNeighbors[1][msg.SenderId]
-		if cnn == nil {
-			fmt.Printf("[%d] cnn is nil\n", n.Id)
-			log.Fatal()
-		}
 		relativeMobility := n.CNN[n.round-1].GetRelativeMobility(msg.Velocity, msg.PosX, msg.PosY, cnn.Degree())
 		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[n.round-1].Id, msg.SenderId, relativeMobility))
-		fmt.Printf("[%d]: Comparing CNN: %d with %d (%f)\n", n.Id, n.CNN[n.round-1].Id, msg.SenderId, relativeMobility)
+		// fmt.Printf("[%d]: Comparing CNN: %d with %d (%f)\n", n.Id, n.CNN[n.round-1].Id, msg.SenderId, relativeMobility)
 		if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[1].Degree() < cnn.Degree()) {
 			n.CNN[1] = cnn
 			minRelativeMob = relativeMobility
@@ -352,36 +345,31 @@ func (n *Node) RelativeMax(d int) {
 		n.PCH[1] = n.CNN[1]
 	} else {
 		n.PCH[1] = n.PCH[0]
-		// chose itself
-		// n.f.WriteString(fmt.Sprintf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id))
-		// fmt.Printf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id)
-		// n.searchNeighborhood(d)
-		// return
 	}
 
 	n.f.WriteString(fmt.Sprintf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id))
-	fmt.Printf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id)
+	// fmt.Printf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id)
 
 	// Each node has to subscribe to its potential pch to be able to receive CNN messages
 	subMsg := messages.NewMessage(n.Id, n.PCH[1].Id, messages.DefaultTTL, messages.NewSubscribeMessage(n.Id))
 	n.sendMsg(subMsg)
 
 	// for the rest of the rounds the CNN is selected based on what the previous CNN has selected
-	for n.round = 2; n.round <= d; n.round++ {
+	for n.round = 2; n.round <= d; {
 		n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 		newMsg := <-n.internalChan
 		cnnMessage, ok := newMsg.(*messages.CNNMessage)
 		if !ok {
-			fmt.Printf("[%d]: Received invalid type message: %+v, expected: CNNMessage\n", n.Id, newMsg)
+			// fmt.Printf("[%d]: Received invalid type message: %+v, expected: CNNMessage\n", n.Id, newMsg)
 			continue
 		}
 		if cnnMessage.Round != n.round {
 			continue
 		}
-		fmt.Printf("[%d]: Received CNN message from: (%d) -> %+v\n", n.Id, cnnMessage.SenderId, cnnMessage)
+		// fmt.Printf("[%d]: Received CNN message from: (%d) -> %+v\n", n.Id, cnnMessage.SenderId, cnnMessage)
 		cnn, ok := cnnMessage.CNN.(*Node)
 		if !ok {
-			fmt.Printf("[%d]: Received invalid cnn: %+v, expected: Node\n", n.Id, cnn)
+			// fmt.Printf("[%d]: Received invalid cnn: %+v, expected: Node\n", n.Id, cnn)
 			continue
 		}
 		n.CNN[n.round] = cnn
@@ -391,11 +379,12 @@ func (n *Node) RelativeMax(d int) {
 			n.PCH[n.round] = n.PCH[n.round-1]
 		}
 		n.f.WriteString(fmt.Sprintf("CNN: %d\tPCH: %d\n", n.CNN[n.round].Id, n.PCH[n.round].Id))
-		fmt.Printf("[%d]: CNN: %d\tPCH: %d\n", n.Id, n.CNN[n.round].Id, n.PCH[n.round].Id)
+		// fmt.Printf("[%d]: CNN: %d\tPCH: %d\n", n.Id, n.CNN[n.round].Id, n.PCH[n.round].Id)
+		n.round++
 	}
 	n.f.WriteString(fmt.Sprintf("CNN: %s\nPCH: %s\n", n.writeCNN(d), n.writePCH(d)))
 	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
-	fmt.Printf("[%d]: Finished all rounds my CH: %d\n", n.Id, n.PCH[d].Id)
+	// fmt.Printf("[%d]: Finished all rounds my CH: %d\n", n.Id, n.PCH[d].Id)
 }
 func (n *Node) GetRelativeMobility(vel float64, x, y float64, degree int) float64 {
 	dx := math.Pow(n.PosX-x, 2)
@@ -437,11 +426,4 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 		}
 	}
 	return []*Node{}
-}
-func printPath(path []*Node) string {
-	s := ""
-	for _, n := range path {
-		s += fmt.Sprintf("%d ", n.Id)
-	}
-	return s + "\n"
 }
