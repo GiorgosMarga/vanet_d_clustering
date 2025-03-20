@@ -263,13 +263,13 @@ mergeLoop:
 			var bestChNode *node.Node
 			// TODO: search neighbor to d to find CHs
 			// checks all CHs that have distance <= d and calculates the relative mobility
-			for newCh := range g.clusters {
-				if ch != newCh {
-					chNode := g.Nodes[newCh]
+			for newPotentialCh := range g.clusters {
+				if ch != newPotentialCh {
+					chNode := g.Nodes[newPotentialCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
 					if len(pathTo) <= g.d && len(pathTo) > 0 {
 						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree())
-						g.Log(fmt.Sprintf("Comparing %d->%d %f\n", ch, newCh, mob))
+						g.Log(fmt.Sprintf("Comparing %d->%d %f\n", ch, newPotentialCh, mob))
 						if mob < bestCh {
 							bestCh = mob
 							bestChNode = chNode
@@ -278,9 +278,17 @@ mergeLoop:
 				}
 			}
 
-			// if there is a better ch node and if all CMs are in distance <= d merge 
+			// if there is a better ch node and if all CMs are in distance <= d merge
 			// else keep cluster as it is
 			if bestChNode != nil {
+				pathToPotentialCh := currCh.FindPath(bestChNode)
+				for _, cm := range pathToPotentialCh {
+					if cm.PCH[g.d] != bestChNode {
+						g.Log(fmt.Sprintf("[%d]: passing through another cluster: %d\n", currCh.Id, cm.PCH[g.d].Id))
+						// passing through another cluster, dont merge
+						continue mergeLoop
+					}
+				}
 				for _, nodeId := range cluster {
 					currNode := g.Nodes[nodeId]
 					if currNode != currCh {
