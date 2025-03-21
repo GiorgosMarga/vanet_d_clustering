@@ -37,6 +37,7 @@ type BeaconMessage struct {
 	Degree   int
 	SenderId int
 	Round    int
+	PCI      int
 }
 
 type CNNMessage struct {
@@ -70,7 +71,7 @@ func NewClusterMessage(clusterId, sender int, isCh bool) *ClusterMessage {
 		Sender:    sender,
 	}
 }
-func NewBeaconMessage(velocity, posx, posy float64, senderId, degree, round int) *BeaconMessage {
+func NewBeaconMessage(velocity, posx, posy float64, senderId, degree, round, pci int) *BeaconMessage {
 	return &BeaconMessage{
 		Velocity: velocity,
 		PosX:     posx,
@@ -78,6 +79,7 @@ func NewBeaconMessage(velocity, posx, posy float64, senderId, degree, round int)
 		Degree:   degree,
 		SenderId: senderId,
 		Round:    round,
+		PCI:      pci,
 	}
 }
 

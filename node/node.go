@@ -6,6 +6,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"slices"
+	"sort"
 	"sync"
 	"time"
 
@@ -333,7 +335,7 @@ func (n *Node) RelativeMax(d int) {
 	minRelativeMob := math.MaxFloat64
 	for msg := range msgs {
 		cnn := n.DHopNeighbors[1][msg.SenderId]
-		relativeMobility := n.CNN[n.round-1].GetRelativeMobility(msg.Velocity, msg.PosX, msg.PosY, cnn.Degree())
+		relativeMobility := n.CNN[n.round-1].GetRelativeMobility(msg.Velocity, msg.PosX, msg.PosY, cnn.Degree(), cnn.PCI())
 		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[n.round-1].Id, msg.SenderId, relativeMobility))
 		// fmt.Printf("[%d]: Comparing CNN: %d with %d (%f)\n", n.Id, n.CNN[n.round-1].Id, msg.SenderId, relativeMobility)
 		if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[1].Degree() < cnn.Degree()) {
@@ -386,11 +388,14 @@ func (n *Node) RelativeMax(d int) {
 	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
 	// fmt.Printf("[%d]: Finished all rounds my CH: %d\n", n.Id, n.PCH[d].Id)
 }
-func (n *Node) GetRelativeMobility(vel float64, x, y float64, degree int) float64 {
+func (n *Node) GetRelativeMobility(vel float64, x, y float64, degree, pci int) float64 {
 	dx := math.Pow(n.PosX-x, 2)
 	dy := math.Pow(n.PosY-y, 2)
 	dxy := math.Sqrt(dx + dy)
+	// Using degree
 	return a*dxy + b*math.Abs(n.Velocity-vel) + c*(float64(n.Degree())-float64(degree))
+	// Using PCI
+	// return a*dxy + b*math.Abs(n.Velocity-vel) + c*(float64(n.PCI())-float64(n.PCI()))
 
 }
 func (n *Node) FindPath(tNode *Node) []*Node {
@@ -426,4 +431,21 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 		}
 	}
 	return []*Node{}
+}
+
+func (n *Node) PCI() int {
+	pciTable := make([]int, len(n.DHopNeighbors[1]))
+	idx := 0
+	for _, node := range n.DHopNeighbors[1] {
+		pciTable[idx] = node.Degree()
+	}
+	sort.Ints(pciTable)
+	slices.Reverse(pciTable)
+	for idx := range len(pciTable) {
+		if idx+1 <= pciTable[idx] {
+			return idx + 1
+		}
+	}
+
+	return len(pciTable)
 }
