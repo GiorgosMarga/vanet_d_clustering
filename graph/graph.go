@@ -128,6 +128,18 @@ func (g *Graph) Log(s string) error {
 	return err
 }
 
+func (g *Graph) NumOfClusters() int {
+	return len(g.clusters)
+}
+
+func (g *Graph) AverageClusterSize() float64 {
+	var clusterSizes float64 = 0
+	for _, c := range g.clusters {
+		clusterSizes += float64(len(c))
+	}
+	return clusterSizes / float64(g.NumOfClusters())
+}
+
 func (g *Graph) PrintCHS() {
 	for _, cn := range g.Nodes {
 		fmt.Printf("[%d]: ", cn.Id)
@@ -268,7 +280,7 @@ mergeLoop:
 					chNode := g.Nodes[newPotentialCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
 					if len(pathTo) <= g.d && len(pathTo) > 0 {
-						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree())
+						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree(), chNode.PCI())
 						g.Log(fmt.Sprintf("Comparing %d->%d %f\n", ch, newPotentialCh, mob))
 						if mob < bestCh {
 							bestCh = mob

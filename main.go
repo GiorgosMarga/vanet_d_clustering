@@ -38,7 +38,8 @@ func main() {
 			log.Fatal(err)
 		}
 		if err := g.ParseGraphFile(fmt.Sprintf("snapshots/%s", snapshot.Name()), "\n\n"); err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			continue
 		}
 
 		g.DHCV()
@@ -48,7 +49,9 @@ func main() {
 		if err := g.GenerateSUMOFile(fmt.Sprintf("sumo/%s.sumo", filename)); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Filename: %s/%s -> Connectivity: %f\n",graphPath,filename, g.CalculateDensity())
+		fmt.Printf("Filename: %s/%s -> Connectivity: %f\n", graphPath, filename, g.CalculateDensity())
+		fmt.Printf("Filename: %s/%s -> Clusters: %d\n", graphPath, filename, g.NumOfClusters())
+		fmt.Printf("Filename: %s/%s -> Average Cluster Size: %f\n", graphPath, filename, g.AverageClusterSize())
 	}
 
 }
