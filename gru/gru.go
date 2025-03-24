@@ -2,8 +2,7 @@ package gru
 
 import (
 	"fmt"
-	"math"
-	"math/rand/v2"
+	"math/rand"
 )
 
 type LossFunction func(yActual [][]float64, yPred [][]float64) float64
@@ -16,162 +15,6 @@ func MeanSquareError(yActual, yPred [][]float64) float64 {
 		sum += diff * diff
 	}
 	return sum / float64(n)
-}
-
-func elementMatrixMul(a, b [][]float64) [][]float64 {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("a and b have different dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
-	}
-
-	result := make([][]float64, len(a))
-	for row := range result {
-		result[row] = make([]float64, 1)
-	}
-
-	for idx := range a {
-		aRow := a[idx]
-		bRow := b[idx]
-		if len(aRow) != len(bRow) {
-			panic(fmt.Sprintf("Different row size: %d to %d\n", len(aRow), len(bRow)))
-		}
-
-		for colIdx := range aRow {
-			result[idx][colIdx] = aRow[colIdx] * bRow[colIdx]
-		}
-	}
-
-	return result
-
-}
-func identityMatrix(rows, cols int) [][]float64 {
-	res := make([][]float64, rows)
-	for row := range res {
-		res[row] = make([]float64, cols)
-		for colIdx := range res[row] {
-			res[row][colIdx] = 1
-		}
-	}
-	return res
-}
-func matrixMul(a, b [][]float64) [][]float64 {
-	if len(a[0]) != len(b) {
-		panic(fmt.Sprintf("Mul: Invalid dimensions: a:(%dx%d) * b(%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
-	}
-	result := make([][]float64, len(a))
-	for row := range len(result) {
-		result[row] = make([]float64, len(b[0]))
-	}
-
-	for idxRow := range a {
-		for idxCol := range b[0] {
-			var sum float64 = 0
-			for c := range a[0] {
-				sum += a[idxRow][c] * b[c][idxCol]
-			}
-			result[idxRow][idxCol] = sum
-		}
-	}
-
-	return result
-}
-
-func matrixAdd(a, b [][]float64) [][]float64 {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("Add: Invalid dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
-	}
-
-	output := make([][]float64, len(a))
-
-	for row := range a {
-		output[row] = make([]float64, len(a[0]))
-		for col := range a[row] {
-			output[row][col] = a[row][col] + b[row][col]
-		}
-	}
-	return output
-
-}
-
-func matrixSub(a, b [][]float64) [][]float64 {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("Sub: Invalid dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
-	}
-
-	output := make([][]float64, len(a))
-
-	for row := range a {
-		output[row] = make([]float64, len(a[0]))
-		for col := range a[row] {
-			output[row][col] = a[row][col] - b[row][col]
-		}
-	}
-	return output
-}
-
-func matrixSubWithScalar(a, b [][]float64, scale float64) [][]float64 {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("SubScale: Invalid dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
-	}
-
-	output := make([][]float64, len(a))
-
-	for row := range a {
-		output[row] = make([]float64, len(a[0]))
-		for col := range a[row] {
-			output[row][col] = a[row][col] - b[row][col]*scale
-		}
-	}
-	return output
-
-}
-
-func matrixOuterProduct(a, b [][]float64) [][]float64 {
-	m := len(a)
-	n := len(b)
-	result := make([][]float64, m)
-	for i := 0; i < m; i++ {
-		result[i] = make([]float64, n)
-		for j := 0; j < n; j++ {
-			result[i][j] = a[i][0] * b[j][0]
-		}
-	}
-	return result
-}
-func randomMatrix(rows, cols int, scale float64) [][]float64 {
-	matrix := make([][]float64, rows)
-	for i := range matrix {
-		matrix[i] = make([]float64, cols)
-		for j := range matrix[i] {
-			matrix[i][j] = (rand.Float64()*2 - 1) * scale // Range: [-scale, scale]
-		}
-	}
-	return matrix
-}
-
-func transposeMatrix(a [][]float64) [][]float64 {
-	res := make([][]float64, len(a[0]))
-	for rowIdx := range res {
-		res[rowIdx] = make([]float64, len(a))
-	}
-	for rowIdx := range a {
-		for colIdx := range a[rowIdx] {
-			res[colIdx][rowIdx] = a[rowIdx][colIdx]
-		}
-	}
-	return res
-}
-func sumRows(matrix [][]float64) [][]float64 {
-	rows := len(matrix)
-	cols := len(matrix[0])
-	sum := make([][]float64, rows)
-
-	for i := range rows {
-		sum[i] = make([]float64, 1)
-		for j := range cols {
-			sum[i][0] += matrix[i][j]
-		}
-	}
-	return sum
 }
 
 type GRU struct {
@@ -223,7 +66,7 @@ func NewGRU(hiddenSize, inputSize int, lossFunction LossFunction, learningRate f
 		Whx:          randomMatrix(hiddenSize, inputSize, scale),
 		Whh:          randomMatrix(hiddenSize, hiddenSize, scale),
 		bh:           randomMatrix(hiddenSize, 1, scale),
-		prevH:        randomMatrix(hiddenSize, 1, 0),
+		finalH:       randomMatrix(hiddenSize, 1, 0),
 		lossFunction: lossFunction,
 		hiddenSize:   hiddenSize,
 		dWhiddenX:    randomMatrix(hiddenSize, inputSize, scale),
@@ -233,6 +76,18 @@ func NewGRU(hiddenSize, inputSize int, lossFunction LossFunction, learningRate f
 		bOut:         randomMatrix(1, 1, scale),
 		learningRate: learningRate,
 	}
+}
+
+func shuffleData(X, Y [][][]float64) {
+	if len(X) != len(Y) {
+		panic("X and Y must have the same number of samples")
+	}
+
+	// Shuffle in place.
+	rand.Shuffle(len(X), func(i, j int) {
+		X[i], X[j] = X[j], X[i]
+		Y[i], Y[j] = Y[j], Y[i]
+	})
 }
 
 func (g *GRU) calculateCandidateHiddenState() [][]float64 {
@@ -258,6 +113,7 @@ func (g *GRU) calculateFinalHiddenState() [][]float64 {
 }
 
 func (g *GRU) forwardPass() ([][]float64, error) {
+	g.prevH = g.finalH
 	var err error
 
 	g.r, err = g.ResetGate.calculate(g.Input, g.prevH)
@@ -325,12 +181,12 @@ func (g *GRU) backwardPass(yActual [][]float64) error {
 	deltaA := elementMatrixMul(dCandidateH, tanhDeriv)
 
 	g.dWhiddenX = matrixAdd(g.dWhiddenX, matrixMul(deltaA, transposeMatrix(g.Input)))
-	Whh_prevH := matrixMul(g.Whh, g.prevH)
+	WhhPrevH := matrixMul(g.Whh, g.prevH)
 	g.dWhiddenH = matrixAdd(g.dWhiddenH, matrixMul(elementMatrixMul(g.r, deltaA), transposeMatrix(g.prevH)))
 	g.dbhidden = matrixAdd(g.dbhidden, sumRows(deltaA))
 
 	// Gradient for Reset Gate (r)
-	drCandidate := elementMatrixMul(Whh_prevH, deltaA)
+	drCandidate := elementMatrixMul(WhhPrevH, deltaA)
 	sigmoidDerivR := elementMatrixMul(g.r, matrixSub(identityMatrix(len(g.r), len(g.r[0])), g.r))
 	deltaR := elementMatrixMul(drCandidate, sigmoidDerivR)
 
@@ -358,78 +214,63 @@ func (g *GRU) initializeHiddenState(hiddenSize int) {
 	}
 	g.prevH = h
 }
-func (g *GRU) Train(inputs, targets [][][]float64, epochs int) error {
+func (g *GRU) Train(inputs, targets [][][]float64, epochs, batchSize int) error {
 	g.initializeHiddenState(g.hiddenSize)
 	for epoch := range epochs {
 		var totalLoss float64 = 0
 
-		for t := range inputs {
-			// Forward pass
-			g.Input = inputs[t]
-			predicted, err := g.forwardPass()
-			if err != nil {
-				return err
-			}
-			loss := g.lossFunction(targets[t], predicted)
-			totalLoss += loss
-			// Backward pass
-			g.backwardPass(targets[t])
+		for batch := 0; batch < len(inputs); batch += batchSize {
 
+			batchEnd := min(batch+batchSize, len(inputs))
+			batchX := inputs[batch:batchEnd]
+			batchY := targets[batch:batchEnd]
+			batchLoss := 0.0
+			g.resetGradients()
+			for t := range batchX {
+				// Forward pass
+				g.Input = batchX[t]
+				predicted, err := g.forwardPass()
+				if err != nil {
+					return err
+				}
+
+				loss := g.lossFunction(batchY[t], predicted)
+				batchLoss += loss
+				// Backward pass
+				g.backwardPass(batchY[t])
+
+			}
 			// Update GRU parameters using gradient descent
 			g.updateWeights()
-			g.prevH = g.finalH
+			totalLoss += batchLoss
 		}
-		// Print average loss for the epoch
-		averageLoss := totalLoss / float64(len(inputs))
-		fmt.Printf("Epoch: %d, Loss: %.4f\n", epoch, averageLoss)
+		averageLoss := totalLoss / float64(len(inputs)/batchSize)
+		fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, averageLoss)
 	}
 
 	return nil
 }
 
-func computeMean(X [][][]float64) float64 {
-	sum := 0.0
-	count := 0
-	for i := range X {
-		for ii := range X[i] {
-			for iii := range X[i][ii] {
-				sum += X[i][ii][iii]
-				count++
-			}
-		}
-	}
-	return sum / float64(count)
-}
-
-func computeStd(X [][][]float64, mean float64) float64 {
-	sumSq := 0.0
-	count := 0
-	for i := range X {
-		for ii := range X[i] {
-			for iii := range X[i][ii] {
-				diff := X[i][ii][iii] - mean
-				sumSq += diff * diff
-				count++
-			}
-		}
-	}
-	return math.Sqrt(sumSq / float64(count))
-}
-
-func standardizeData(X [][][]float64) [][][]float64 {
-	mean := computeMean(X)
-	std := computeStd(X, mean)
-
-	standardized := make([][][]float64, len(X))
-	for i := range X {
-		standardized[i] = make([][]float64, len(X[i]))
-		for ii := range X[i] {
-			standardized[i][ii] = make([]float64, len(X[i][ii]))
-			for iii := range X[i][ii] {
-				standardized[i][ii][iii] = (X[i][ii][iii] - mean) / std
-			}
+func (g *GRU) resetGradients() {
+	for row := range g.dWhiddenH {
+		for colIdx := range g.dWhiddenH[row] {
+			g.dWhiddenH[row][colIdx] = 0
 		}
 	}
 
-	return standardized
+	for row := range g.dWhiddenX {
+		for colIdx := range g.dWhiddenX[row] {
+			g.dWhiddenX[row][colIdx] = 0
+		}
+	}
+
+	for row := range g.dbhidden {
+		for colIdx := range g.dbhidden[row] {
+			g.dbhidden[row][colIdx] = 0
+		}
+	}
+
+	g.ResetGate.resetGradients()
+	g.UpdateGate.resetGradients()
+
 }

@@ -52,10 +52,12 @@ func TestElementMatrixMul(t *testing.T) {
 }
 
 func TestTrain(t *testing.T) {
-	X := make([][][]float64, 100)
-	Y := make([][][]float64, 100)
+	size := 500
+	X := make([][][]float64, size)
+	Y := make([][][]float64, size)
+	trainSize := int(float64(size) * 0.8)
 
-	for i := range 100 {
+	for i := range size {
 		X[i] = make([][]float64, 4)
 		Y[i] = make([][]float64, 1)
 		for j := range 4 {
@@ -63,27 +65,47 @@ func TestTrain(t *testing.T) {
 		}
 		Y[i][0] = []float64{float64(i + 4)}
 	}
-	s := NewScaler()
-	s.Fit(X)
-	X = s.Transform(X)
-	Y = s.Transform(Y)
-	g := NewGRU(256, 4, MeanSquareError, 0.0001)
-	if err := g.Train(X[:len(X)-5], Y[:len(Y)-5], 100); err != nil {
+	shuffleData(X, Y)
+	sx := NewScaler()
+	sx.Fit(X)
+	X = sx.Transform(X)
+
+	sy := NewScaler()
+	sy.Fit(Y)
+	Y = sy.Transform(Y)
+	g := NewGRU(64, 4, MeanSquareError, 0.005)
+	if err := g.Train(X[:trainSize], Y[:trainSize], 250, 20); err != nil {
 		t.Error(err)
 	}
-	fmt.Println("Predictions:")
 
-	testX := X[len(X)-5:]
-	testY := Y[len(Y)-5:]
+	testX := X[trainSize:]
+	testY := Y[trainSize:]
+	fmt.Printf("[")
 	for i := range testX {
 		g.Input = testX[i]
 		output, _ := g.forwardPass()
-		fmt.Printf("Predicted: %v, Target: %v\n",
-			s.InverseTransform([][][]float64{output}), s.InverseTransform([][][]float64{testY[i]}))
+		if i == 0 {
+			fmt.Printf("%f", sx.InverseTransform([][][]float64{output})[0][0][0])
+		} else {
+			fmt.Printf(",%f", sx.InverseTransform([][][]float64{output})[0][0][0])
+		}
 	}
+	fmt.Println("]")
+	fmt.Printf("[")
+	for i := range testY {
+		if i == 0 {
+			fmt.Printf("%f", sy.InverseTransform([][][]float64{testY[i]})[0][0][0])
+		} else {
+			fmt.Printf(",%f", sy.InverseTransform([][][]float64{testY[i]})[0][0][0])
+		}
+	}
+	fmt.Println("]")
 
-	g.Input = X[25]
+	X = [][][]float64{{{8000}, {8001}, {8002}, {8003}}}
+	predScaler := NewScaler()
+	predScaler.Fit(X)
+	predScaler.Transform(X)
+	g.Input = X[0]
 	output, _ := g.forwardPass()
-	fmt.Printf("Predicted: %v, Target: %v\n",
-		s.InverseTransform([][][]float64{output}), s.InverseTransform([][][]float64{Y[25]}))
+	fmt.Printf("%f", predScaler.InverseTransform([][][]float64{output})[0][0][0])
 }
