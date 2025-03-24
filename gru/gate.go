@@ -117,7 +117,24 @@ func (g *Gate) updateWeights(lr float64) {
 	g.weightH = matrixSubWithScalar(g.weightH, g.dWH, lr)
 	g.bias = matrixSubWithScalar(g.bias, g.db, lr)
 }
+func (g *Gate) resetGradients() {
+	for row := range g.dWH {
+		for col := range g.dWH[row] {
+			g.dWH[row][col] = 0
+		}
+	}
 
+	for row := range g.dWX {
+		for col := range g.dWX[row] {
+			g.dWX[row][col] = 0
+		}
+	}
+	for row := range g.db {
+		for col := range g.db[row] {
+			g.db[row][col] = 0
+		}
+	}
+}
 func printMatrix(a [][]float64) {
 	fmt.Println()
 
