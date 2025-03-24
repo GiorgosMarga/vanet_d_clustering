@@ -1,3 +1,3 @@
-module github.com/GiorgosMarga/vanet_d_clustering
+module vanet_d_clustering
 
-go 1.22.1
+go 1.24.0
