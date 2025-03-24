@@ -64,6 +64,22 @@ type ClusterMessage struct {
 	Sender    int
 }
 
+type WeightsMessage struct {
+	SenderId           int
+	ResetWeights       [][]float64
+	UpdateWeights      [][]float64
+	HiddenStateWeights [][]float64
+}
+
+func NewWeightsMessage(senderId int, resetWeights, updateWeights, hiddenStateWeights [][]float64) *WeightsMessage {
+	return &WeightsMessage{
+		SenderId:           senderId,
+		ResetWeights:       resetWeights,
+		UpdateWeights:      updateWeights,
+		HiddenStateWeights: hiddenStateWeights,
+	}
+}
+
 func NewClusterMessage(clusterId, sender int, isCh bool) *ClusterMessage {
 	return &ClusterMessage{
 		ClusterId: clusterId,

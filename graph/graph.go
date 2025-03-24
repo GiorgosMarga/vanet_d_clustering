@@ -33,23 +33,25 @@ type Graph struct {
 	links            int
 }
 
-func NewGraph(minClusterNumber, d int, filename string) (*Graph, error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, err
-	}
+func NewGraph(minClusterNumber, d int) (*Graph, error) {
 	return &Graph{
 		Nodes:            make(map[int]*node.Node),
 		wg:               sync.WaitGroup{},
 		clusters:         make(map[int][]int),
 		minClusterNumber: minClusterNumber,
 		d:                d,
-		f:                f,
 		links:            0,
 	}, nil
 }
-
+func (g *Graph) ResetGraph() {
+	g.clusters = make(map[int][]int)
+	for _, n := range g.Nodes {
+		n.ResetNode()
+	}
+	g.links = 0
+}
 func (g *Graph) ParseGraphFile(path string, splitter string) error {
+	g.ResetGraph()
 	f, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -80,6 +82,13 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 			}
 		}
 
+		nodeId := t[0]
+		if n, ok := g.Nodes[int(nodeId)]; ok {
+
+			n.UpdateNode(t[1], t[2], t[3])
+			continue
+		}
+
 		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], fmt.Sprintf("./cars_info/%s_%d.info", filename, int(t[0])))
 		g.AddNode(node)
 	}
@@ -103,6 +112,13 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		n1, n2 := g.Nodes[node1Id], g.Nodes[node2Id]
 		n1.AddNeighbor(n2)
 		g.links++
+	}
+
+	for _, n := range g.Nodes {
+		if len(n.DHopNeighbors) == 0 {
+			// this node doesnt exist in the snapshot and should be removed
+			delete(g.Nodes, n.Id)
+		}
 	}
 	return nil
 }
@@ -174,18 +190,16 @@ func (g *Graph) DHCV() {
 
 	for _, n := range g.Nodes {
 		go n.Beacon(ctx)
-	}
-
-	for _, n := range g.Nodes {
+		go n.Start(ctx, g.d)
 		wg.Add(1)
+		// go func() {
+			
+		// 	wg.Done()
+		// }()
 		go func() {
-			n.Start(ctx, g.d)
+			n.RelativeMax(g.d)
 			wg.Done()
 		}()
-	}
-
-	for _, n := range g.Nodes {
-		go n.RelativeMax(g.d)
 	}
 	wg.Wait()
 
@@ -324,8 +338,12 @@ mergeLoop:
 		}
 	}
 	g.formClusters()
-	g.Log(fmt.Sprintln(g.clusters))
-	g.Log(fmt.Sprintln("Density:", g.CalculateDensity()))
+	fmt.Println(g.clusters)
+
+	for _, n := range g.Nodes {
+		n.SendWeights()
+	}
+
 }
 
 func (g *Graph) CalculateDensity() float32 {
@@ -336,6 +354,10 @@ func (g *Graph) formClusters() {
 
 	for _, n := range g.Nodes {
 		ch := n.PCH[g.d]
+		if ch == nil {
+			fmt.Printf("%+v\n", n)
+			panic(fmt.Sprintf("[%d]: nil ch: %+v\n", n.Id, n.PCH))
+		}
 		if _, ok := g.clusters[ch.Id]; !ok {
 			g.clusters[ch.Id] = make([]int, 0)
 		}
@@ -360,7 +382,7 @@ func (g *Graph) PlotGraph(filename string, d int) error {
 	}
 
 	for _, n := range g.Nodes {
-		for _, neighbor := range n.DHopNeighbors[1] {
+		for _, neighbor := range n.DHopNeighbors {
 			if neighbor.Id > n.Id {
 				f.WriteString(fmt.Sprintf("\t%d -- %d;\n", n.Id, neighbor.Id))
 			}

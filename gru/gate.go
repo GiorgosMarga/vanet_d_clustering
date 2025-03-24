@@ -60,9 +60,9 @@ type Gate struct {
 	// activation function for the gate ex. sigmoid
 	activationFunc ActivationFunction
 	// weight matrix for the input Xt
-	weightX [][]float64
+	WeightX [][]float64
 	// weight matrix for the previous hidden state Ht-1
-	weightH [][]float64
+	WeightH [][]float64
 	// bias hiddenSizex1
 	bias [][]float64
 
@@ -73,25 +73,25 @@ type Gate struct {
 	db  [][]float64
 }
 
-func NewGate(bias, weightH, weightX [][]float64, activationFunction ActivationFunction) *Gate {
+func NewGate(bias, WeightH, WeightX [][]float64, activationFunction ActivationFunction) *Gate {
 
 	return &Gate{
 		activationFunc: activationFunction,
-		weightX:        weightX,
-		weightH:        weightH,
+		WeightX:        WeightX,
+		WeightH:        WeightH,
 		bias:           bias,
-		dWX:            randomMatrix(len(weightX), len(weightX[0]), 1.0/float64(len(bias))),
-		dWH:            randomMatrix(len(weightH), len(weightH[0]), 1.0/float64(len(bias))),
+		dWX:            randomMatrix(len(WeightX), len(WeightX[0]), 1.0/float64(len(bias))),
+		dWH:            randomMatrix(len(WeightH), len(WeightH[0]), 1.0/float64(len(bias))),
 		db:             randomMatrix(len(bias), len(bias[0]), 1.0/float64(len(bias))),
 	}
 }
 
 // calculate calculates the result of the gate
-// activationFunction(weightX*x + weightH*prevH + b)
+// activationFunction(WeightX*x + WeightH*prevH + b)
 // -> activationFunction(wx+wh+b)
 func (rs *Gate) calculate(x, prevH [][]float64) ([][]float64, error) {
-	wx := matrixMul(rs.weightX, x)
-	wh := matrixMul(rs.weightH, prevH)
+	wx := matrixMul(rs.WeightX, x)
+	wh := matrixMul(rs.WeightH, prevH)
 	if len(wx) != len(wh) {
 		return nil, fmt.Errorf("Invalid xw and hw sizes: %d and %d\n", len(wx), len(wh))
 	}
@@ -113,8 +113,8 @@ func (rs *Gate) calculate(x, prevH [][]float64) ([][]float64, error) {
 }
 
 func (g *Gate) updateWeights(lr float64) {
-	g.weightX = matrixSubWithScalar(g.weightX, g.dWX, lr)
-	g.weightH = matrixSubWithScalar(g.weightH, g.dWH, lr)
+	g.WeightX = matrixSubWithScalar(g.WeightX, g.dWX, lr)
+	g.WeightH = matrixSubWithScalar(g.WeightH, g.dWH, lr)
 	g.bias = matrixSubWithScalar(g.bias, g.db, lr)
 }
 func (g *Gate) resetGradients() {

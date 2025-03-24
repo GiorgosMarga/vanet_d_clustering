@@ -27,16 +27,17 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// TODO: add filename
+	g, err := graph.NewGraph(minClusterNumber, d)
+	if err != nil {
+		log.Fatal(err)
+	}
 	for _, snapshot := range f {
-
 		filename := utils.GetFileName(snapshot.Name())
 		if err != nil {
 			log.Fatal(err)
 		}
-		g, err := graph.NewGraph(minClusterNumber, d, fmt.Sprintf("graph_info/%s.info", filename))
-		if err != nil {
-			log.Fatal(err)
-		}
+
 		if err := g.ParseGraphFile(fmt.Sprintf("snapshots/%s", snapshot.Name()), "\n\n"); err != nil {
 			fmt.Println(err)
 			continue
