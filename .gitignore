@@ -4,3 +4,4 @@ graph_info/
 graphviz/
 sumo/
 test_results.txt
+snapshots/

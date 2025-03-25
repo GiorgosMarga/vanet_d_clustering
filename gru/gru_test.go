@@ -109,3 +109,33 @@ func TestTrain(t *testing.T) {
 	output, _ := g.forwardPass()
 	fmt.Printf("%f", predScaler.InverseTransform([][][]float64{output})[0][0][0])
 }
+
+func TestIdentityMatrix(t *testing.T) {
+	t1 := identityMatrix(10, 10)
+	if len(t1) != 10 || len(t1[0]) != 10 {
+		t.FailNow()
+	}
+	for row := range len(t1) {
+		for _, val := range t1[row] {
+			if val != 1 {
+				t.FailNow()
+			}
+		}
+	}
+}
+func TestMatrixAverage(t *testing.T) {
+	t1 := identityMatrix(10, 10)
+	t2 := identityMatrix(10, 10)
+	t3 := identityMatrix(10, 10)
+
+	average := matrixAverage([][][]float64{t1, t2, t3})
+
+	for row := range average {
+		for _,val := range average[row] {
+			if val != 1 {
+				t.FailNow()
+			} 
+		}
+	}
+
+}
