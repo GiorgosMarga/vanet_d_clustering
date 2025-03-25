@@ -168,3 +168,38 @@ func sumRows(matrix [][]float64) [][]float64 {
 	}
 	return sum
 }
+
+func matrixScale(a [][]float64, scaler float64) [][]float64 {
+	res := make([][]float64, len(a))
+	for row := range a {
+		res[row] = make([]float64, len(a[row]))
+		for colIdx := range a[row] {
+			res[row][colIdx] = a[row][colIdx] * scaler
+		}
+	}
+	return res
+}
+
+func matrixAverage(matrices [][][]float64) [][]float64 {
+	// matrix -> rows x col
+	rows := len(matrices[0])
+	cols := len(matrices[0][0])
+
+	for _, matrix := range matrices {
+		if len(matrix) != rows || len(matrix[0]) != cols {
+			panic(fmt.Sprintf("Invalid matrix size: Expected: (%dx%d), got: (%dx%d)\n", rows, cols, len(matrix), len(matrix[0])))
+		}
+	}
+
+	t := make([][]float64, rows)
+
+	for row := range t {
+		t[row] = make([]float64, cols)
+		for colIdx := range t[row] {
+			for _, m := range matrices {
+				t[row][colIdx] += m[row][colIdx]
+			}
+		}
+	}
+	return matrixScale(t, 1/float64(len(matrices)))
+}
