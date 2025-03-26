@@ -10,6 +10,8 @@ import (
 	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
+var requiredFolders = []string{"cars_info", "graphviz", "sumo"}
+
 func main() {
 	var (
 		d                int
@@ -27,6 +29,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	for _, folder := range requiredFolders {
+		if _, err := os.Stat(folder); os.IsNotExist(err) {
+			err = os.Mkdir(folder, 0777)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Successfully created folder: (%s)\n", folder)
+		}
+	}
+
 	// TODO: add filename
 	g, err := graph.NewGraph(minClusterNumber, d)
 	if err != nil {
@@ -37,7 +49,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-
 		if err := g.ParseGraphFile(fmt.Sprintf("snapshots/%s", snapshot.Name()), "\n\n"); err != nil {
 			fmt.Println(err)
 			continue

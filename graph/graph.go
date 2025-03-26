@@ -59,6 +59,8 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 
 	filename := utils.GetFileName(path)
 
+	carInfoFileName := strings.Split(filename, "/")[1]
+
 	sf := string(f)
 	sf = strings.Replace(sf, "\r\n", "\n", -1)
 	splitted := strings.Split(sf, splitter)
@@ -89,7 +91,7 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 			continue
 		}
 
-		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], fmt.Sprintf("./cars_info/%s_%d.info", filename, int(t[0])))
+		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], fmt.Sprintf("./cars_info/%s_%d.info", carInfoFileName, int(t[0])))
 		g.AddNode(node)
 	}
 
