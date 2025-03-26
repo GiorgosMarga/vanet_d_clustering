@@ -52,7 +52,7 @@ func TestElementMatrixMul(t *testing.T) {
 }
 
 func TestTrain(t *testing.T) {
-	size := 500
+	size := 200
 	X := make([][][]float64, size)
 	Y := make([][][]float64, size)
 	trainSize := int(float64(size) * 0.8)
@@ -61,10 +61,14 @@ func TestTrain(t *testing.T) {
 		X[i] = make([][]float64, 4)
 		Y[i] = make([][]float64, 1)
 		for j := range 4 {
-			X[i][j] = []float64{float64(i + j)}
+			X[i][j] = []float64{float64((i + 1) * j)}
 		}
-		Y[i][0] = []float64{float64(i + 4)}
+		Y[i][0] = []float64{float64(X[i][len(X[i])-1][0] + 1)}
 	}
+
+	fmt.Println(X[0], Y[0])
+	fmt.Println(X[1], Y[1])
+	fmt.Println(X[3], Y[2])
 	shuffleData(X, Y)
 	sx := NewScaler()
 	sx.Fit(X)
@@ -73,8 +77,8 @@ func TestTrain(t *testing.T) {
 	sy := NewScaler()
 	sy.Fit(Y)
 	Y = sy.Transform(Y)
-	g := NewGRU(32, 4, MeanSquareError, 0.008)
-	if err := g.Train(X[:trainSize], Y[:trainSize], 250, 30); err != nil {
+	g := NewGRU(128, 4, MeanSquareError, 0.005)
+	if err := g.Train(X[:trainSize], Y[:trainSize], 500, 20); err != nil {
 		t.Error(err)
 	}
 
@@ -82,17 +86,27 @@ func TestTrain(t *testing.T) {
 	testY := Y[trainSize:]
 	yPred := make([][]float64, len(testX))
 	yActual := make([][]float64, len(testX))
+	fmt.Printf("[")
 	for i := range testX {
 		g.Input = testX[i]
 		output, _ := g.forwardPass()
 		yPred[i] = sx.InverseTransform([][][]float64{output})[0][0]
+		if i == 0 {
+			fmt.Printf("%f ", yPred[i][0])
+		} else {
+			fmt.Printf(",%f ", yPred[i][0])
+		}
 	}
+	fmt.Printf("]\n[")
 	for i := range testY {
 		yActual[i] = sy.InverseTransform([][][]float64{testY[i]})[0][0]
+		if i == 0 {
+			fmt.Printf("%f", yActual[i][0])
+		} else {
+			fmt.Printf(", %f", yActual[i][0])
+		}
 	}
-	fmt.Println(yPred)
-	fmt.Println(yActual)
-
+	fmt.Printf("]\n")
 	X = [][][]float64{{{80000}, {80001}, {80002}, {80003}}}
 	predScaler := NewScaler()
 	predScaler.Fit(X)
@@ -100,7 +114,7 @@ func TestTrain(t *testing.T) {
 	g.Input = X[0]
 	output, _ := g.forwardPass()
 	fmt.Printf("%f\n", predScaler.InverseTransform([][][]float64{output})[0][0][0])
-	fmt.Println(R2Score(yActual, yPred))
+	fmt.Println(R2Score(yActual, yPred) * 100)
 }
 
 func TestIdentityMatrix(t *testing.T) {

@@ -65,18 +65,14 @@ type ClusterMessage struct {
 }
 
 type WeightsMessage struct {
-	SenderId           int
-	ResetWeights       [][]float64
-	UpdateWeights      [][]float64
-	HiddenStateWeights [][]float64
+	SenderId int
+	Weights  [][][]float64
 }
 
-func NewWeightsMessage(senderId int, resetWeights, updateWeights, hiddenStateWeights [][]float64) *WeightsMessage {
+func NewWeightsMessage(senderId int, weights [][][]float64) *WeightsMessage {
 	return &WeightsMessage{
-		SenderId:           senderId,
-		ResetWeights:       resetWeights,
-		UpdateWeights:      updateWeights,
-		HiddenStateWeights: hiddenStateWeights,
+		SenderId: senderId,
+		Weights:  weights,
 	}
 }
 

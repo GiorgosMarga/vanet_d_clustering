@@ -339,8 +339,12 @@ mergeLoop:
 	fmt.Println(g.clusters)
 
 	for _, n := range g.Nodes {
+		var (
+			clusterSize int
+			val         []int
+		)
 		val, ok := g.clusters[n.Id]
-		var clusterSize int
+
 		if !ok {
 			clusterSize = 0
 		} else {
@@ -348,7 +352,7 @@ mergeLoop:
 		}
 		wg.Add(1)
 		go func() {
-			n.HandleWeightsExchange(clusterSize)
+			n.HandleWeightsExchange(clusterSize, val)
 			wg.Done()
 		}()
 	}

@@ -78,7 +78,7 @@ func (n *Node) ResetNode() {
 }
 
 func (n *Node) SendWeights() {
-	n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, messages.NewWeightsMessage(n.Id, n.gru.ResetGate.WeightH, n.gru.UpdateGate.WeightH, n.gru.Whh)))
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, messages.NewWeightsMessage(n.Id, n.gru.GetWeights())))
 }
 func PrintPath(path []*Node) {
 	for _, n := range path {
@@ -87,10 +87,10 @@ func PrintPath(path []*Node) {
 	fmt.Println()
 }
 
-// TODO: change cluster size
-func (n *Node) HandleWeightsExchange(clusterSize int) {
+// TODO: change cluster size and fix function (no if/else) split ?
+func (n *Node) HandleWeightsExchange(clusterSize int, cluster []int) {
 	if n.isCH() {
-		weights := make([][][]float64, clusterSize)
+		weights := make([][][][]float64, clusterSize)
 		ctr := 0
 		for ctr < clusterSize-1 {
 			msg := <-n.internalChan
@@ -98,17 +98,42 @@ func (n *Node) HandleWeightsExchange(clusterSize int) {
 			if !ok {
 				continue
 			}
-			weights[ctr] = weightMessage.UpdateWeights
+			weights[ctr] = weightMessage.Weights
 			ctr++
 		}
-		weights[len(weights)-1] = n.gru.UpdateGate.WeightH
-		// averageWeights := gru.MatrixAverage(weights)
+		weights[len(weights)-1] = n.gru.GetWeights()
 
-		// fmt.Printf("[%d]: weights: %v\n", n.Id, averageWeights)
+		average := make([][][]float64, len(weights[0]))
+		for weightType := range weights[0] {
+			weightsToProcess := make([][][]float64, clusterSize)
+			for idx := range weights {
+				weightsToProcess[idx] = weights[idx][weightType]
+			}
+			average[weightType] = gru.MatrixAverage(weightsToProcess)
+		}
+		n.gru.SetWeights(average)
+		for _, nodeId := range cluster {
+			if nodeId != n.Id {
+				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, messages.NewWeightsMessage(n.Id, average)))
+			}
+		}
 		return
 
 	} else {
 		n.SendWeights()
+
+		for {
+			msg := <-n.internalChan
+			weightsMessage, ok := msg.(*messages.WeightsMessage)
+			if !ok {
+				continue
+			}
+			if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
+				panic(err)
+			}
+			n.f.WriteString(fmt.Sprintf("%v\n", weightsMessage.Weights))
+			break
+		}
 	}
 }
 

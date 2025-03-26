@@ -61,9 +61,9 @@ func main() {
 		if err := g.GenerateSUMOFile(fmt.Sprintf("sumo/%s.sumo", filename)); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Filename: %s/%s -> Connectivity: %f\n", graphPath, filename, g.CalculateDensity())
-		fmt.Printf("Filename: %s/%s -> Clusters: %d\n", graphPath, filename, g.NumOfClusters())
-		fmt.Printf("Filename: %s/%s -> Average Cluster Size: %f\n", graphPath, filename, g.AverageClusterSize())
+		fmt.Printf("Filename: %s -> Connectivity: %f\n", filename, g.CalculateDensity())
+		fmt.Printf("Filename: %s -> Clusters: %d\n", filename, g.NumOfClusters())
+		fmt.Printf("Filename: %s -> Average Cluster Size: %f\n", filename, g.AverageClusterSize())
 	}
 
 }
