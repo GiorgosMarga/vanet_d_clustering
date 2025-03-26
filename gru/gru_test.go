@@ -73,41 +73,34 @@ func TestTrain(t *testing.T) {
 	sy := NewScaler()
 	sy.Fit(Y)
 	Y = sy.Transform(Y)
-	g := NewGRU(64, 4, MeanSquareError, 0.005)
-	if err := g.Train(X[:trainSize], Y[:trainSize], 250, 20); err != nil {
+	g := NewGRU(32, 4, MeanSquareError, 0.008)
+	if err := g.Train(X[:trainSize], Y[:trainSize], 250, 30); err != nil {
 		t.Error(err)
 	}
 
 	testX := X[trainSize:]
 	testY := Y[trainSize:]
-	fmt.Printf("[")
+	yPred := make([][]float64, len(testX))
+	yActual := make([][]float64, len(testX))
 	for i := range testX {
 		g.Input = testX[i]
 		output, _ := g.forwardPass()
-		if i == 0 {
-			fmt.Printf("%f", sx.InverseTransform([][][]float64{output})[0][0][0])
-		} else {
-			fmt.Printf(",%f", sx.InverseTransform([][][]float64{output})[0][0][0])
-		}
+		yPred[i] = sx.InverseTransform([][][]float64{output})[0][0]
 	}
-	fmt.Println("]")
-	fmt.Printf("[")
 	for i := range testY {
-		if i == 0 {
-			fmt.Printf("%f", sy.InverseTransform([][][]float64{testY[i]})[0][0][0])
-		} else {
-			fmt.Printf(",%f", sy.InverseTransform([][][]float64{testY[i]})[0][0][0])
-		}
+		yActual[i] = sy.InverseTransform([][][]float64{testY[i]})[0][0]
 	}
-	fmt.Println("]")
+	fmt.Println(yPred)
+	fmt.Println(yActual)
 
-	X = [][][]float64{{{8000}, {8001}, {8002}, {8003}}}
+	X = [][][]float64{{{80000}, {80001}, {80002}, {80003}}}
 	predScaler := NewScaler()
 	predScaler.Fit(X)
 	predScaler.Transform(X)
 	g.Input = X[0]
 	output, _ := g.forwardPass()
-	fmt.Printf("%f", predScaler.InverseTransform([][][]float64{output})[0][0][0])
+	fmt.Printf("%f\n", predScaler.InverseTransform([][][]float64{output})[0][0][0])
+	fmt.Println(R2Score(yActual, yPred))
 }
 
 func TestIdentityMatrix(t *testing.T) {
@@ -128,13 +121,13 @@ func TestMatrixAverage(t *testing.T) {
 	t2 := identityMatrix(10, 10)
 	t3 := identityMatrix(10, 10)
 
-	average := matrixAverage([][][]float64{t1, t2, t3})
+	average := MatrixAverage([][][]float64{t1, t2, t3})
 
 	for row := range average {
-		for _,val := range average[row] {
+		for _, val := range average[row] {
 			if val != 1 {
 				t.FailNow()
-			} 
+			}
 		}
 	}
 

@@ -274,3 +274,31 @@ func (g *GRU) resetGradients() {
 	g.UpdateGate.resetGradients()
 
 }
+
+func R2Score(yActual, yPred [][]float64) float64 {
+	if len(yActual) != len(yPred) {
+		panic("yActual and yPred must have the same length")
+	}
+
+	var sumActual float64 = 0
+	n := len(yActual)
+	for i := range n {
+		sumActual += yActual[i][0]
+	}
+	meanActual := sumActual / float64(n)
+
+	var rss, tss float64 = 0, 0
+	for i := range n {
+		diff := yActual[i][0] - yPred[i][0]
+		rss += diff * diff
+		tss += (yActual[i][0] - meanActual) * (yActual[i][0] - meanActual)
+	}
+
+	// If TSS is zero (constant actual values), return R² = 1
+	if tss == 0 {
+		return 1
+	}
+
+	r2 := 1 - (rss / tss)
+	return r2
+}

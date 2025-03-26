@@ -192,10 +192,6 @@ func (g *Graph) DHCV() {
 		go n.Beacon(ctx)
 		go n.Start(ctx, g.d)
 		wg.Add(1)
-		// go func() {
-			
-		// 	wg.Done()
-		// }()
 		go func() {
 			n.RelativeMax(g.d)
 			wg.Done()
@@ -341,9 +337,20 @@ mergeLoop:
 	fmt.Println(g.clusters)
 
 	for _, n := range g.Nodes {
-		n.SendWeights()
+		val, ok := g.clusters[n.Id]
+		var clusterSize int
+		if !ok {
+			clusterSize = 0
+		} else {
+			clusterSize = len(val)
+		}
+		wg.Add(1)
+		go func() {
+			n.HandleWeightsExchange(clusterSize)
+			wg.Done()
+		}()
 	}
-
+	wg.Wait()
 }
 
 func (g *Graph) CalculateDensity() float32 {
