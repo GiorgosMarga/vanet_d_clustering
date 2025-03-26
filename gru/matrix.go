@@ -180,7 +180,10 @@ func matrixScale(a [][]float64, scaler float64) [][]float64 {
 	return res
 }
 
-func matrixAverage(matrices [][][]float64) [][]float64 {
+func MatrixAverage(matrices [][][]float64) [][]float64 {
+	if len(matrices) == 1 {
+		return matrices[0]
+	}
 	// matrix -> rows x col
 	rows := len(matrices[0])
 	cols := len(matrices[0][0])

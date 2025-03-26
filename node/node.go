@@ -59,7 +59,7 @@ func NewNode(id, d int, posx, posy, velocity float64, filename string) *Node {
 		f:             f,
 		DHopNeighbors: make(map[int]*Node),
 		subscribers:   make(map[int]struct{}),
-		gru:           gru.NewGRU(12, 3, gru.MeanSquareError, 0.001),
+		gru:           gru.NewGRU(2, 2, gru.MeanSquareError, 0.001),
 	}
 }
 
@@ -78,15 +78,38 @@ func (n *Node) ResetNode() {
 }
 
 func (n *Node) SendWeights() {
-	if !n.isCH() {
-		n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, messages.NewWeightsMessage(n.Id, n.gru.ResetGate.WeightH, n.gru.UpdateGate.WeightH, n.gru.Whh)))
-	}
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, messages.NewWeightsMessage(n.Id, n.gru.ResetGate.WeightH, n.gru.UpdateGate.WeightH, n.gru.Whh)))
 }
 func PrintPath(path []*Node) {
 	for _, n := range path {
 		fmt.Printf("%d ", n.Id)
 	}
 	fmt.Println()
+}
+
+// TODO: change cluster size
+func (n *Node) HandleWeightsExchange(clusterSize int) {
+	if n.isCH() {
+		weights := make([][][]float64, clusterSize)
+		ctr := 0
+		for ctr < clusterSize-1 {
+			msg := <-n.internalChan
+			weightMessage, ok := msg.(*messages.WeightsMessage)
+			if !ok {
+				continue
+			}
+			weights[ctr] = weightMessage.UpdateWeights
+			ctr++
+		}
+		weights[len(weights)-1] = n.gru.UpdateGate.WeightH
+		// averageWeights := gru.MatrixAverage(weights)
+
+		// fmt.Printf("[%d]: weights: %v\n", n.Id, averageWeights)
+		return
+
+	} else {
+		n.SendWeights()
+	}
 }
 
 func (n *Node) writePCH(d int) string {
@@ -283,7 +306,6 @@ func (n *Node) Start(ctx context.Context, d int) {
 				senderId := m.Msg.(*messages.SubscribeMsg).SenderId
 				n.subscribers[senderId] = struct{}{}
 			case *messages.WeightsMessage:
-				// fmt.Printf("[%d]: %+v\n", n.Id, msg)
 			}
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
