@@ -10,7 +10,7 @@ import (
 	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
-var requiredFolders = []string{"cars_info", "graphviz", "sumo"}
+var requiredFolders = []string{"cars_info", "graphviz", "sumo", "graph_images"}
 
 func main() {
 	var (
@@ -49,7 +49,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := g.ParseGraphFile(fmt.Sprintf("snapshots/%s", snapshot.Name()), "\n\n"); err != nil {
+		g.Log(fmt.Sprintf("------------%s----------\n", filename))
+		if err := g.ParseGraphFile(fmt.Sprintf("%s/%s", graphPath, snapshot.Name()), "\n\n"); err != nil {
 			fmt.Println(err)
 			continue
 		}
@@ -61,9 +62,7 @@ func main() {
 		if err := g.GenerateSUMOFile(fmt.Sprintf("sumo/%s.sumo", filename)); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Filename: %s -> Connectivity: %f\n", filename, g.CalculateDensity())
-		fmt.Printf("Filename: %s -> Clusters: %d\n", filename, g.NumOfClusters())
-		fmt.Printf("Filename: %s -> Average Cluster Size: %f\n", filename, g.AverageClusterSize())
+		fmt.Printf("Filename: %s -> Connectivity: %d%% \tClusters: %d\tAverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
 	}
 
 }

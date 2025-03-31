@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"slices"
@@ -34,6 +35,10 @@ type Graph struct {
 }
 
 func NewGraph(minClusterNumber, d int) (*Graph, error) {
+	f, err := os.OpenFile("graph.info", os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return &Graph{
 		Nodes:            make(map[int]*node.Node),
 		wg:               sync.WaitGroup{},
@@ -41,6 +46,7 @@ func NewGraph(minClusterNumber, d int) (*Graph, error) {
 		minClusterNumber: minClusterNumber,
 		d:                d,
 		links:            0,
+		f:                f,
 	}, nil
 }
 func (g *Graph) ResetGraph() {
@@ -71,11 +77,11 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	nodes, connections := string(splitted[0]), string(splitted[1])[:len(string(splitted[1]))-1]
 	for _, n := range strings.Split(nodes, "\n") {
 		splitted := strings.Split(strings.TrimSpace(n), " ")
-		if len(splitted) != 4 {
+		if len(splitted) != 5 {
 			return fmt.Errorf("failed to split nodes correctly (%s)", path)
 		}
 
-		t := make([]float64, 4)
+		t := make([]float64, 5)
 		var err error
 		for idx := range splitted {
 			t[idx], err = strconv.ParseFloat(splitted[idx], 64)
@@ -87,11 +93,11 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		nodeId := t[0]
 		if n, ok := g.Nodes[int(nodeId)]; ok {
 
-			n.UpdateNode(t[1], t[2], t[3])
+			n.UpdateNode(t[1], t[2], t[3], t[4])
 			continue
 		}
 
-		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], fmt.Sprintf("./cars_info/%s_%d.info", carInfoFileName, int(t[0])))
+		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], t[4], fmt.Sprintf("./cars_info/%s_%d.info", carInfoFileName, int(t[0])))
 		g.AddNode(node)
 	}
 
@@ -187,7 +193,7 @@ func (g *Graph) GenerateSUMOFile(filename string) error {
 
 func (g *Graph) DHCV() {
 	wg := sync.WaitGroup{}
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	for _, n := range g.Nodes {
@@ -203,22 +209,26 @@ func (g *Graph) DHCV() {
 
 	g.formClusters()
 	// exception 1
-mainLoop:
-	for {
-		for _, n := range g.Nodes {
-			ch := n.PCH[g.d]
-			pathToCH := n.FindPath(ch)
-			// for each node in the path, if the node is a CH then join
-			// the CH might not have select itself as CH
-			for _, node := range pathToCH {
-				if node.PCH[g.d] != n.PCH[g.d] && node != ch {
-					n.PCH[g.d] = g.Nodes[node.Id]
-					g.Log(fmt.Sprintf("[%d]: Passing through %d(%d) -> new CH: %d\n", n.Id, node.Id, node.PCH[g.d].Id, g.Nodes[node.Id].Id))
-					continue mainLoop
+	for _, n := range g.Nodes {
+		ch := n.PCH[g.d]
+		if ch.Id == n.Id {
+			continue
+		}
+		pathToCH := n.FindPath(ch)
+		// for each node in the path, if the node is a CH then join
+		// the CH might not have select itself as CH
+		for _, node := range pathToCH {
+			if node.PCH[g.d] != n.PCH[g.d] {
+				newPotentialPCH := node.PCH[g.d]
+				if len(n.FindPath(newPotentialPCH)) >= g.d {
+					g.Log(fmt.Sprintf("[%d]:%d Passing through %d(%d) cant satisfy d\n", n.Id, n.PCH[g.d].Id, node.Id, node.PCH[g.d].Id))
+					n.PCH[g.d] = n.PCH[1]
+					continue
 				}
+				n.PCH[g.d] = node.PCH[g.d]
+				continue
 			}
 		}
-		break
 	}
 	g.formClusters()
 	g.Log(fmt.Sprintln(g.clusters))
@@ -256,10 +266,10 @@ exceptionLoop:
 	g.Log(fmt.Sprintln("Exception 3"))
 	// exception 3
 exception3Loop:
-	for _, cluster := range g.clusters {
+	for chId, cluster := range g.clusters {
 		if len(cluster) == 1 {
 			// CH with no CMs
-			n := g.Nodes[cluster[0]]
+			n := g.Nodes[chId]
 			for i := g.d - 1; i >= 0; i-- {
 				potentialCH := n.CNN[i].PCH[g.d]
 				if len(n.FindPath(potentialCH)) <= g.d {
@@ -292,7 +302,7 @@ mergeLoop:
 					chNode := g.Nodes[newPotentialCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
 					if len(pathTo) <= g.d && len(pathTo) > 0 {
-						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree(), chNode.PCI())
+						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.Angle, chNode.PosX, chNode.PosY, chNode.Degree(), chNode.PCI())
 						g.Log(fmt.Sprintf("Comparing %d->%d %f\n", ch, newPotentialCh, mob))
 						if mob < bestCh {
 							bestCh = mob
@@ -310,7 +320,9 @@ mergeLoop:
 					if cm.PCH[g.d] != bestChNode {
 						g.Log(fmt.Sprintf("[%d]: passing through another cluster: %d\n", currCh.Id, cm.PCH[g.d].Id))
 						// passing through another cluster, dont merge
-						continue mergeLoop
+						bestChNode = cm.PCH[g.d]
+						// continue mergeLoop
+						break
 					}
 				}
 				for _, nodeId := range cluster {
@@ -336,27 +348,17 @@ mergeLoop:
 		}
 	}
 	g.formClusters()
-	fmt.Println(g.clusters)
 
 	for _, n := range g.Nodes {
-		var (
-			clusterSize int
-			val         []int
-		)
-		val, ok := g.clusters[n.Id]
-
-		if !ok {
-			clusterSize = 0
-		} else {
-			clusterSize = len(val)
-		}
 		wg.Add(1)
 		go func() {
-			n.HandleWeightsExchange(clusterSize, val)
+			n.HandleWeightsExchange(g.clusters)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
+
+	g.Log(fmt.Sprintf("%v\n", g.clusters))
 }
 
 func (g *Graph) CalculateDensity() float32 {
@@ -367,10 +369,6 @@ func (g *Graph) formClusters() {
 
 	for _, n := range g.Nodes {
 		ch := n.PCH[g.d]
-		if ch == nil {
-			fmt.Printf("%+v\n", n)
-			panic(fmt.Sprintf("[%d]: nil ch: %+v\n", n.Id, n.PCH))
-		}
 		if _, ok := g.clusters[ch.Id]; !ok {
 			g.clusters[ch.Id] = make([]int, 0)
 		}

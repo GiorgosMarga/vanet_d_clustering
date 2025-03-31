@@ -180,7 +180,7 @@ func matrixScale(a [][]float64, scaler float64) [][]float64 {
 	return res
 }
 
-func MatrixAverage(matrices [][][]float64) [][]float64 {
+func matrixAverage(matrices [][][]float64) [][]float64 {
 	if len(matrices) == 1 {
 		return matrices[0]
 	}
@@ -205,4 +205,16 @@ func MatrixAverage(matrices [][][]float64) [][]float64 {
 		}
 	}
 	return matrixScale(t, 1/float64(len(matrices)))
+}
+
+func CalculateAverageWeights(matrices [][][][]float64) [][][]float64 {
+	average := make([][][]float64, len(matrices[0]))
+	for weightType := range matrices[0] {
+		weightsToProcess := make([][][]float64, len(matrices))
+		for idx := range matrices {
+			weightsToProcess[idx] = matrices[idx][weightType]
+		}
+		average[weightType] = matrixAverage(weightsToProcess)
+	}
+	return average
 }

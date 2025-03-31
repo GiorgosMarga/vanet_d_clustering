@@ -34,6 +34,7 @@ type BeaconMessage struct {
 	Velocity float64
 	PosX     float64
 	PosY     float64
+	Angle    float64
 	Degree   int
 	SenderId int
 	Round    int
@@ -69,6 +70,11 @@ type WeightsMessage struct {
 	Weights  [][][]float64
 }
 
+type ClusterWeightsMessage struct {
+	SenderId       int
+	AverageWeights [][][]float64
+}
+
 func NewWeightsMessage(senderId int, weights [][][]float64) *WeightsMessage {
 	return &WeightsMessage{
 		SenderId: senderId,
@@ -83,12 +89,13 @@ func NewClusterMessage(clusterId, sender int, isCh bool) *ClusterMessage {
 		Sender:    sender,
 	}
 }
-func NewBeaconMessage(velocity, posx, posy float64, senderId, degree, round, pci int) *BeaconMessage {
+func NewBeaconMessage(velocity, posx, posy, angle float64, senderId, degree, round, pci int) *BeaconMessage {
 	return &BeaconMessage{
 		Velocity: velocity,
 		PosX:     posx,
 		PosY:     posy,
 		Degree:   degree,
+		Angle:    angle,
 		SenderId: senderId,
 		Round:    round,
 		PCI:      pci,

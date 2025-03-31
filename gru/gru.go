@@ -18,6 +18,7 @@ func MeanSquareError(yActual, yPred [][]float64) float64 {
 }
 
 type GRU struct {
+
 	// update gate
 	UpdateGate *Gate
 	// reset gate
@@ -54,9 +55,12 @@ type GRU struct {
 	wOut   [][]float64
 	bOut   [][]float64
 	output [][]float64
+
+	// early stopping patience
+	earlyStop *EarlyStop
 }
 
-func NewGRU(hiddenSize, inputSize int, lossFunction LossFunction, learningRate float64) *GRU {
+func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, learningRate float64) *GRU {
 	scale := 1.0 / float64(hiddenSize) // Xavier-like scaling
 	updateGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	resetGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
@@ -75,6 +79,7 @@ func NewGRU(hiddenSize, inputSize int, lossFunction LossFunction, learningRate f
 		wOut:         randomMatrix(1, hiddenSize, scale),
 		bOut:         randomMatrix(1, 1, scale),
 		learningRate: learningRate,
+		earlyStop:    NewEarlyStop(patience, 0.001),
 	}
 }
 
@@ -245,6 +250,10 @@ func (g *GRU) Train(inputs, targets [][][]float64, epochs, batchSize int) error 
 			totalLoss += batchLoss
 		}
 		averageLoss := totalLoss / float64(len(inputs)/batchSize)
+		if g.earlyStop.CheckEarlyStop(averageLoss) {
+			fmt.Printf("Early stopping at epoch %d\n", epoch)
+			break
+		}
 		fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, averageLoss)
 	}
 

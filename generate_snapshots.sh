@@ -19,13 +19,13 @@ if ! command -v dot >/dev/null 2>&1; then
 fi
 
 # Check if any .dot files exist
-if ! ls cars*.dot >/dev/null 2>&1; then
+if ! ls *.dot >/dev/null 2>&1; then
     echo "Error: No cars*.dot files found in graphviz directory"
     exit 1
 fi
 
 # Loop through the files
-for file in cars*.dot; do
+for file in *.dot; do
     if [ -f "$file" ]; then
         filename=$(basename "$file" .dot)
         if dot -Tpng "$file" -o "../graph_images/$filename.png"; then
