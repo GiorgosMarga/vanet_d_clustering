@@ -2,9 +2,6 @@ package gru
 
 import (
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 	"testing"
 )
 
@@ -150,87 +147,41 @@ func TestMatrixAverage(t *testing.T) {
 
 }
 
-func parseFile(filename string) ([][][]float64, [][][]float64) {
-	f, err := os.ReadFile(filename)
-	if err != nil {
-		panic(err)
-	}
-
-	lines := strings.Split(string(f[:len(f)-1]), "\n")
-
-	values := int(len(lines) / 5)
-	fmt.Println(values)
-
-	var X [][][]float64
-	var Y [][][]float64
-	for line := range len(lines) {
-		if line+5 > len(lines) {
-			break
-		}
-		t := make([][]float64, 4)
-		for i := range 4 {
-			n, err := strconv.ParseFloat(lines[line+i], 64)
-			if err != nil {
-				panic(err)
-			}
-			t[i] = []float64{n}
-		}
-		X = append(X, t)
-		n, err := strconv.ParseFloat(lines[line+4], 64)
-		if err != nil {
-			panic(err)
-		}
-		t2 := make([][]float64, 1)
-		t2[0] = []float64{n}
-		Y = append(Y, t2)
-	}
-	return X, Y
-
-}
-
 func TestParseFile(t *testing.T) {
-	X, Y := parseFile("../data/car_0.txt")
-	trainSize := int(float64(len(X)) * 0.8)
-
-	fmt.Printf("Train Size: %d\n", trainSize)
-	fmt.Printf("Test Size: %d\n", len(X)-trainSize)
-	shuffleData(X, Y)
-	sx := NewScaler()
-	sx.Fit(X)
-	X = sx.Transform(X)
-
-	sy := NewScaler()
-	sy.Fit(Y)
-	Y = sy.Transform(Y)
-	g := NewGRU(64, 4, 10, MeanSquareError, 0.005)
-	if err := g.Train(X[:trainSize], Y[:trainSize], 150, 5); err != nil {
-		t.Error(err)
-	}
-
-	testX := X[trainSize:]
-	testY := Y[trainSize:]
-	yPred := make([][]float64, len(testX))
-	yActual := make([][]float64, len(testX))
-	fmt.Printf("[")
-	for i := range testX {
-		g.Input = testX[i]
-		output, _ := g.forwardPass()
-		yPred[i] = sx.InverseTransform([][][]float64{output})[0][0]
-		if i == 0 {
-			fmt.Printf("%f ", yPred[i][0])
-		} else {
-			fmt.Printf(",%f ", yPred[i][0])
+	for i := range 70 {
+		g := NewGRU(1, 4, 10, MeanSquareError, 0.005)
+		err := g.ParseFile(fmt.Sprintf("../data/car_%d.txt", i%60))
+		if err != nil {
+			fmt.Println(err)
+			t.FailNow()
 		}
-	}
-	fmt.Printf("]\n[")
-	for i := range testY {
-		yActual[i] = sy.InverseTransform([][][]float64{testY[i]})[0][0]
-		if i == 0 {
-			fmt.Printf("%f", yActual[i][0])
-		} else {
-			fmt.Printf(", %f", yActual[i][0])
-		}
-	}
-	fmt.Printf("]\n")
 
+		trainSize := int(float64(len(g.X)) * 0.8)
+		if err := g.Train(g.X[:trainSize], g.Y[:trainSize], 2, 5); err != nil {
+			t.Error(err)
+
+		}
+		// }
+		// fmt.Printf("[")
+		// for i := range testX {
+		// 	g.Input = testX[i]
+		// 	output, _ := g.forwardPass()
+		// 	yPred[i] = g.sx.InverseTransform([][][]float64{output})[0][0]
+		// 	if i == 0 {
+		// 		fmt.Printf("%f ", yPred[i][0])
+		// 	} else {
+		// 		fmt.Printf(",%f ", yPred[i][0])
+		// 	}
+		// }
+		// fmt.Printf("]\n[")
+		// for i := range testY {
+		// 	yActual[i] = g.sy.InverseTransform([][][]float64{testY[i]})[0][0]
+		// 	if i == 0 {
+		// 		fmt.Printf("%f", yActual[i][0])
+		// 	} else {
+		// 		fmt.Printf(", %f", yActual[i][0])
+		// 	}
+		// }
+		// fmt.Printf("]\n")
+	}
 }

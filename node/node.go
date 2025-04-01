@@ -15,9 +15,14 @@ import (
 )
 
 const (
-	a = 0.1
-	b = 0.9
-	c = 1
+	a                   = 0.1
+	b                   = 0.9
+	c                   = 1
+	TrainSizePercentage = 0.8
+	HiddenStateSize     = 16
+	InputSize           = 4
+	Epochs              = 5
+	BatchSize           = 10
 )
 
 type Node struct {
@@ -44,6 +49,11 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		log.Fatal(err)
 	}
 
+	gru := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, 0.001)
+	if err := gru.ParseFile(fmt.Sprintf("./data/car_%d.txt", id%60)); err != nil {
+		panic(err)
+	}
+
 	return &Node{
 		Id:            id,
 		Velocity:      velocity,
@@ -59,7 +69,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		f:             f,
 		DHopNeighbors: make(map[int]*Node),
 		subscribers:   make(map[int]struct{}),
-		gru:           gru.NewGRU(2, 2, 10, gru.MeanSquareError, 0.001),
+		gru:           gru,
 	}
 }
 
@@ -90,24 +100,55 @@ func PrintPath(path []*Node) string {
 	return s
 }
 
+func (n *Node) Predict() error {
+	n.f.WriteString(fmt.Sprintf("Predicting node %d\n", n.Id))
+	output, err := n.gru.Predict(n.gru.X[0])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[%d]: Predicted: %f, Expected: %f\n", n.Id, n.gru.Sx.InverseTransform([][][]float64{output})[0][0], n.gru.Sx.InverseTransform([][][]float64{n.gru.Y[0]})[0][0])
+	n.f.WriteString(fmt.Sprintf("Finished predicting node %d\n", n.Id))
+	return nil
+}
+func (n *Node) Train() error {
+
+	trainSize := int(float64(len(n.gru.X)) * TrainSizePercentage)
+
+	n.f.WriteString(fmt.Sprintf("Training node %d\n", n.Id))
+	if err := n.gru.Train(n.gru.X[:trainSize], n.gru.Y[:trainSize], Epochs, BatchSize); err != nil {
+		return err
+	}
+	n.f.WriteString(fmt.Sprintf("Finished training node %d\n", n.Id))
+	// print errors
+	n.f.WriteString(fmt.Sprintf("Errors: %+v\n", n.gru.Errors))
+	return nil
+}
+
 // TODO: change cluster size and fix function (no if/else) split ?
 func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 	myCluster := clusters[n.PCH[len(n.PCH)-1].Id]
 	clusterSize := len(myCluster)
 	if n.IsCH() {
-		weights := make([][][][]float64, clusterSize)
-		ctr := 0
-		for ctr < clusterSize-1 {
-			msg := <-n.internalChan
-			weightMessage, ok := msg.(*messages.WeightsMessage)
-			if !ok {
-				continue
+		n.f.WriteString(fmt.Sprintf("[%d]: Expecting %d weights\n", n.Id, clusterSize-1))
+		weights := make([][][][]float64, 1, clusterSize)
+		weights[0] = n.gru.GetWeights()
+		timer := time.NewTimer(100 * time.Millisecond)
+		defer timer.Stop()
+	membersLoop:
+		for len(weights) < clusterSize {
+			select {
+			case msg := <-n.internalChan:
+				weightMessage, ok := msg.(*messages.WeightsMessage)
+				if !ok {
+					continue
+				}
+				weights = append(weights, weightMessage.Weights)
+			case <-timer.C:
+				n.f.WriteString(fmt.Sprintf("[%d]: Received only %d weights\n", n.Id, len(weights)))
+				break membersLoop
 			}
-			weights[ctr] = weightMessage.Weights
-			ctr++
-		}
-		weights[len(weights)-1] = n.gru.GetWeights()
 
+		}
 		averageWeights := gru.CalculateAverageWeights(weights)
 
 		// send average weights to all cluster heads
@@ -123,14 +164,15 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		}
 
 		// receive average weights from other cluster heads
-		averageWeightsFromClusters := make([][][][]float64, 0, len(clusters))
+		averageWeightsFromClusters := make([][][][]float64, 1, len(clusters))
+		averageWeightsFromClusters[0] = averageWeights
 
 		// since there is no path to all cluster heads, if cluster doesnt receive
 		// a message from a cluster head, in 100ms, it stops waiting
 		// and calculates the average weights
 	clustersLoop:
 		for range len(clusters) {
-			timer := time.NewTimer(500 * time.Millisecond)
+			timer := time.NewTimer(100 * time.Millisecond)
 			select {
 			case msg := <-n.internalChan:
 				weightMessage, ok := msg.(*messages.ClusterWeightsMessage)
@@ -142,11 +184,9 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 					<-timer.C
 				}
 			case <-timer.C:
-				break clustersLoop
+				continue clustersLoop
 			}
 		}
-		averageWeightsFromClusters = append(averageWeightsFromClusters, averageWeights)
-
 		totalAverage := gru.CalculateAverageWeights(averageWeightsFromClusters)
 
 		for _, nodeId := range myCluster {
@@ -157,22 +197,33 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		if err := n.gru.SetWeights(totalAverage); err != nil {
 			panic(err)
 		}
-		n.f.WriteString(fmt.Sprintf("CH: %d, Weights: %v\n", n.Id, totalAverage))
+		n.f.WriteString(fmt.Sprintf("[%d]: Finished exchanging weights\n", n.Id))
 		return
-
 	}
+	// this is executed only by the cluster members
 	n.SendWeights()
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
+outerLoop:
 	for {
-		msg := <-n.internalChan
-		weightsMessage, ok := msg.(*messages.WeightsMessage)
-		if !ok {
-			continue
+		select {
+		case msg := <-n.internalChan:
+			weightsMessage, ok := msg.(*messages.WeightsMessage)
+			if !ok {
+				continue
+			}
+			if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
+				panic(err)
+			}
+			n.f.WriteString(fmt.Sprintf("CH: %d, Weights: %v\n", n.Id, weightsMessage.Weights))
+			break outerLoop
+		case <-timer.C:
+			fmt.Printf("[%d]: Did not receive weights\n", n.Id)
+			n.printPCH(len(n.PCH))
+			break outerLoop
+
 		}
-		if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
-			panic(err)
-		}
-		n.f.WriteString(fmt.Sprintf("CH: %d, Weights: %v\n", n.Id, weightsMessage.Weights))
-		break
+
 	}
 }
 
@@ -193,9 +244,10 @@ func (n *Node) writeCNN(d int) string {
 	return s
 }
 func (n *Node) printPCH(d int) {
+	fmt.Printf("[%d]: PCH: %d\n", n.Id, len(n.PCH))
 	fmt.Printf("[%d]: ", n.Id)
 	for i := range d {
-		fmt.Printf("%d(%d) ", n.PCH[i].Id, n.PCH[i].PCH[d].Id)
+		fmt.Printf("%d ", n.PCH[i].Id)
 	}
 	fmt.Println()
 }
@@ -210,8 +262,7 @@ func (n *Node) Degree() int {
 }
 func (n *Node) IsCH() bool {
 	if n.PCH[len(n.PCH)-1] == nil {
-		log.Fatalf("[%d]: %+v\n", n.Id, n.PCH)
-
+		panic(fmt.Sprintf("[%d]: %+v\n", n.Id, n.PCH))
 	}
 	return n.PCH[len(n.PCH)-1].Id == n.Id
 }
@@ -453,10 +504,9 @@ func (n *Node) RelativeMax(d int) {
 		} else {
 			n.PCH[n.round] = n.PCH[n.round-1]
 		}
-		n.f.WriteString(fmt.Sprintf("CNN: %d\tPCH: %d\n", n.CNN[n.round].Id, n.PCH[n.round].Id))
+		n.f.WriteString(fmt.Sprintf("[%d]: Round %d: CNN: %d, PCH: %d\n", n.Id, n.round, n.CNN[n.round].Id, n.PCH[n.round].Id))
 		n.round++
 	}
-	n.f.WriteString(fmt.Sprintf("CNN: %s\nPCH: %s\n", n.writeCNN(d), n.writePCH(d)))
 	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
 }
 func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, pci int) float64 {

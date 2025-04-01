@@ -10,10 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/node"
-	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
 var colors = []string{
@@ -32,13 +30,20 @@ type Graph struct {
 	d                int
 	f                *os.File
 	links            int
+	PoolOfNodes      map[int]*node.Node
 }
 
-func NewGraph(minClusterNumber, d int) (*Graph, error) {
+func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
 	f, err := os.OpenFile("graph.info", os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
+	pool := make(map[int]*node.Node)
+
+	for id := range numOfNodes {
+		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, fmt.Sprintf("./cars_info/car_%d.info", id))
+	}
+	fmt.Printf("Initialized %d nodes\n", numOfNodes)
 	return &Graph{
 		Nodes:            make(map[int]*node.Node),
 		wg:               sync.WaitGroup{},
@@ -47,6 +52,7 @@ func NewGraph(minClusterNumber, d int) (*Graph, error) {
 		d:                d,
 		links:            0,
 		f:                f,
+		PoolOfNodes:      pool,
 	}, nil
 }
 func (g *Graph) ResetGraph() {
@@ -62,10 +68,6 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	if err != nil {
 		return err
 	}
-
-	filename := utils.GetFileName(path)
-
-	carInfoFileName := strings.Split(filename, "/")[1]
 
 	sf := string(f)
 	sf = strings.Replace(sf, "\r\n", "\n", -1)
@@ -90,18 +92,24 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 			}
 		}
 
-		nodeId := t[0]
-		if n, ok := g.Nodes[int(nodeId)]; ok {
-
-			n.UpdateNode(t[1], t[2], t[3], t[4])
+		var n *node.Node
+		nodeId := int(t[0])
+		n, ok := g.Nodes[nodeId]
+		if !ok {
+			n = g.PoolOfNodes[nodeId]
+		}
+		if n == nil {
+			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], fmt.Sprintf("./cars_info/car_%d.info", nodeId))
+			g.AddNode(n)
 			continue
 		}
-
-		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], t[4], fmt.Sprintf("./cars_info/%s_%d.info", carInfoFileName, int(t[0])))
-		g.AddNode(node)
+		n.UpdateNode(t[1], t[2], t[3], t[4])
+		g.AddNode(n)
 	}
 
-	for _, connection := range strings.Split(connections, "\n") {
+	totalConnections := strings.Split(connections, "\n")
+	g.links = len(totalConnections)
+	for _, connection := range totalConnections {
 		splitted := strings.Split(strings.TrimSpace(connection), "-")
 		if len(splitted) != 2 {
 			return fmt.Errorf("failed to split connections correctly %s", connection)
@@ -119,7 +127,6 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		}
 		n1, n2 := g.Nodes[node1Id], g.Nodes[node2Id]
 		n1.AddNeighbor(n2)
-		g.links++
 	}
 
 	for _, n := range g.Nodes {
@@ -193,11 +200,12 @@ func (g *Graph) GenerateSUMOFile(filename string) error {
 
 func (g *Graph) DHCV() {
 	wg := sync.WaitGroup{}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+	beaconCTX, cancelBeacon := context.WithCancel(context.Background())
 	defer cancel()
 
 	for _, n := range g.Nodes {
-		go n.Beacon(ctx)
+		go n.Beacon(beaconCTX)
 		go n.Start(ctx, g.d)
 		wg.Add(1)
 		go func() {
@@ -222,11 +230,11 @@ func (g *Graph) DHCV() {
 				newPotentialPCH := node.PCH[g.d]
 				if len(n.FindPath(newPotentialPCH)) >= g.d {
 					g.Log(fmt.Sprintf("[%d]:%d Passing through %d(%d) cant satisfy d\n", n.Id, n.PCH[g.d].Id, node.Id, node.PCH[g.d].Id))
-					n.PCH[g.d] = n.PCH[1]
-					continue
+					n.PCH[g.d] = n.CNN[1]
+					break
 				}
-				n.PCH[g.d] = node.PCH[g.d]
-				continue
+				n.PCH[g.d] = newPotentialPCH
+				break
 			}
 		}
 	}
@@ -348,6 +356,21 @@ mergeLoop:
 		}
 	}
 	g.formClusters()
+	g.Log(fmt.Sprintf("%v\n", g.clusters))
+
+	cancelBeacon()
+	// training
+	for _, n := range g.Nodes {
+		wg.Add(1)
+		go func() {
+			n.Train()
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	fmt.Printf("All nodes finished training\n")
+	g.Log(fmt.Sprintf("Trained %d nodes\n", len(g.Nodes)))
 
 	for _, n := range g.Nodes {
 		wg.Add(1)
@@ -357,8 +380,7 @@ mergeLoop:
 		}()
 	}
 	wg.Wait()
-
-	g.Log(fmt.Sprintf("%v\n", g.clusters))
+	g.Log(fmt.Sprintf("Exchanged %d nodes\n", len(g.Nodes)))
 }
 
 func (g *Graph) CalculateDensity() float32 {

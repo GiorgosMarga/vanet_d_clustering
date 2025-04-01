@@ -16,12 +16,14 @@ func main() {
 	var (
 		d                int
 		minClusterNumber int
+		nodes            int
 		graphPath        string
 	)
 
 	flag.IntVar(&d, "d", 2, "d")
 	flag.IntVar(&minClusterNumber, "m", 3, "The minimum number of cluster members a cluster can have.")
 	flag.StringVar(&graphPath, "g", "snapshots", "The path to the graph folder that contains the graphs.")
+	flag.IntVar(&nodes, "n", 60, "The total number of nodes. Used to create a pool of nodes.")
 	flag.Parse()
 
 	f, err := os.ReadDir(graphPath)
@@ -40,7 +42,7 @@ func main() {
 	}
 
 	// TODO: add filename
-	g, err := graph.NewGraph(minClusterNumber, d)
+	g, err := graph.NewGraph(minClusterNumber, d, nodes)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,12 +59,17 @@ func main() {
 
 		g.DHCV()
 		if err := g.PlotGraph(fmt.Sprintf("graphviz/%s.dot", filename), d); err != nil {
-			log.Fatal(err)
+			log.Fatal("Plot error:", err)
 		}
 		if err := g.GenerateSUMOFile(fmt.Sprintf("sumo/%s.sumo", filename)); err != nil {
-			log.Fatal(err)
+			log.Fatal("Generating SUMO:", err)
 		}
-		fmt.Printf("Filename: %s -> Connectivity: %d%% \tClusters: %d\tAverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
+		fmt.Printf("Filename: %s -> Connectivity: %d%% | Clusters: %d | AverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
+
 	}
 
+	for _, node := range g.Nodes {
+		node.Predict()
+		break
+	}
 }

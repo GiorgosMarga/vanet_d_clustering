@@ -208,6 +208,9 @@ func matrixAverage(matrices [][][]float64) [][]float64 {
 }
 
 func CalculateAverageWeights(matrices [][][][]float64) [][][]float64 {
+	if len(matrices) == 1 {
+		return matrices[0]
+	}
 	average := make([][][]float64, len(matrices[0]))
 	for weightType := range matrices[0] {
 		weightsToProcess := make([][][]float64, len(matrices))
