@@ -34,14 +34,14 @@ type Graph struct {
 }
 
 func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
-	f, err := os.OpenFile("graph.info", os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
+	f, err := os.OpenFile("../graph_info/graph.info", os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 	pool := make(map[int]*node.Node)
 
 	for id := range numOfNodes {
-		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, fmt.Sprintf("./cars_info/car_%d.info", id))
+		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, fmt.Sprintf("../cars_info/car_%d.info", id))
 	}
 	fmt.Printf("Initialized %d nodes\n", numOfNodes)
 	return &Graph{
@@ -206,7 +206,7 @@ func (g *Graph) DHCV() {
 
 	for _, n := range g.Nodes {
 		go n.Beacon(beaconCTX)
-		go n.Start(ctx, g.d)
+		go n.Start(ctx)
 		wg.Add(1)
 		go func() {
 			n.RelativeMax(g.d)

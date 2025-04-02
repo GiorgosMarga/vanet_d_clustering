@@ -6,11 +6,9 @@ import (
 )
 
 const (
-	BcastMsg = iota
-	BeaconMsg
+	DefaultTTL = 10 // rebroadcasts
+	BFSTTL     = 60
 )
-
-const DefaultTTL = 10 // rebroadcasts
 
 type Message struct {
 	ID   int
@@ -73,6 +71,23 @@ type WeightsMessage struct {
 type ClusterWeightsMessage struct {
 	SenderId       int
 	AverageWeights [][][]float64
+}
+
+type FindClusterMessage struct {
+}
+
+type BFSRequestMessage struct {
+	SenderId int
+	Level    int
+	ParentId int
+	Path     []int
+	Target   int
+}
+
+type BFSResponseMessage struct {
+	Level  int
+	Path   []int
+	Target int
 }
 
 func NewWeightsMessage(senderId int, weights [][][]float64) *WeightsMessage {

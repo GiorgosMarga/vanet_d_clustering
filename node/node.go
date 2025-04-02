@@ -50,7 +50,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 	}
 
 	gru := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, 0.001)
-	if err := gru.ParseFile(fmt.Sprintf("./data/car_%d.txt", id%60)); err != nil {
+	if err := gru.ParseFile(fmt.Sprintf("../data/car_%d.txt", id%60)); err != nil {
 		panic(err)
 	}
 
@@ -364,6 +364,15 @@ func (n *Node) advertiseCluster() {
 		n.sendMsg(msg)
 	}
 }
+func (n *Node) getNeighborIDS() []int {
+	ids := make([]int, len(n.DHopNeighbors))
+	i := 0
+	for id := range n.DHopNeighbors {
+		ids[i] = id
+		i++
+	}
+	return ids
+}
 
 // Beacon sends a beacon message to all neighbors.
 func (n *Node) Beacon(ctx context.Context) {
@@ -382,7 +391,7 @@ func (n *Node) Beacon(ctx context.Context) {
 
 	}
 }
-func (n *Node) Start(ctx context.Context, d int) {
+func (n *Node) Start(ctx context.Context) {
 	var (
 		messagesReceived = make(map[int]struct{})
 	)
@@ -423,6 +432,23 @@ func (n *Node) Start(ctx context.Context, d int) {
 				n.subscribers[senderId] = struct{}{}
 			case *messages.WeightsMessage:
 			case *messages.ClusterWeightsMessage:
+			case *messages.BFSRequestMessage:
+				if msg.Target == n.Id {
+					response := messages.NewMessage(n.Id, msg.Path[msg.Level], messages.DefaultTTL, &messages.BFSResponseMessage{
+						Level:  msg.Level - 1,
+						Path:   msg.Path,
+						Target: msg.SenderId,
+					})
+					n.sendMsg(response)
+					continue
+				}
+				n.rebcastBFSMessage(m, m.From)
+			case *messages.BFSResponseMessage:
+
+				if msg.Target != n.Id {
+					n.handleBFSResposneMessage(msg)
+					continue
+				}
 			}
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
@@ -432,6 +458,42 @@ func (n *Node) Start(ctx context.Context, d int) {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
+}
+
+func (n *Node) rebcastBFSMessage(msg *messages.Message, senderId int) {
+
+	bfsMsg, ok := msg.Msg.(*messages.BFSRequestMessage)
+	if !ok {
+		panic("Invalid message type")
+	}
+
+	tBfsMsg := *bfsMsg
+	path := make([]int, len(bfsMsg.Path)+1)
+	copy(path, bfsMsg.Path)
+	path[len(path)-1] = n.Id
+	tBfsMsg.Path = path
+	tBfsMsg.Level = bfsMsg.Level + 1
+	tBfsMsg.ParentId = senderId
+
+	for _, neighbor := range n.DHopNeighbors {
+		if neighbor.Id == senderId {
+			continue
+		}
+		m := *msg
+
+		m.To = neighbor.Id
+		m.Msg = &tBfsMsg
+		m.From = n.Id
+		n.sendMsg(&m)
+
+	}
+}
+
+func (n *Node) handleBFSResposneMessage(msg *messages.BFSResponseMessage) {
+	m := *msg
+	to := m.Path[msg.Level]
+	m.Level = msg.Level - 1
+	n.sendMsg(messages.NewMessage(n.Id, to, messages.DefaultTTL, &m))
 }
 
 func (n *Node) RelativeMax(d int) {
@@ -522,6 +584,62 @@ func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, pci int) fl
 	// return a*dxy + b*math.Abs(n.Velocity-vel) + c*(float64(n.PCI())-float64(n.PCI()))
 
 }
+
+func (n *Node) PCI() int {
+	pciTable := make([]int, len(n.DHopNeighbors))
+	idx := 0
+	for _, node := range n.DHopNeighbors {
+		pciTable[idx] = node.Degree()
+	}
+	sort.Ints(pciTable)
+	slices.Reverse(pciTable)
+	for idx := range len(pciTable) {
+		if idx+1 <= pciTable[idx] {
+			return idx + 1
+		}
+	}
+
+	return len(pciTable)
+}
+
+func (n *Node) Exceptions() error {
+	// 1st exception: Check if in my path to CH there is no other cluster
+
+	// 2nd exception: Check if in node didn't select itself as CH
+
+	// 3nd exception: Check if cluster has members other than CH
+	return nil
+}
+
+func (n *Node) DistributedBFS(targetNode int) []int {
+
+	for _, neighbor := range n.DHopNeighbors {
+		msg := messages.NewMessage(n.Id, neighbor.Id, messages.DefaultTTL, &messages.BFSRequestMessage{
+			SenderId: n.Id,
+			Level:    0,
+			ParentId: n.Id,
+			Path:     []int{n.Id},
+			Target:   targetNode,
+		})
+		n.sendMsg(msg)
+	}
+	timer := time.NewTimer(1 * time.Minute)
+	for {
+		select {
+		case m := <-n.internalChan:
+			msg, ok := m.(*messages.BFSResponseMessage)
+			if !ok {
+				continue
+			}
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return append(msg.Path, targetNode)[1:]
+		case <-timer.C:
+			return []int{}
+		}
+	}
+}
 func (n *Node) FindPath(tNode *Node) []*Node {
 	type state struct {
 		node *Node
@@ -557,19 +675,4 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 	return []*Node{}
 }
 
-func (n *Node) PCI() int {
-	pciTable := make([]int, len(n.DHopNeighbors))
-	idx := 0
-	for _, node := range n.DHopNeighbors {
-		pciTable[idx] = node.Degree()
-	}
-	sort.Ints(pciTable)
-	slices.Reverse(pciTable)
-	for idx := range len(pciTable) {
-		if idx+1 <= pciTable[idx] {
-			return idx + 1
-		}
-	}
 
-	return len(pciTable)
-}
