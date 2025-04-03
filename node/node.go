@@ -42,7 +42,7 @@ type Node struct {
 	subscribers   map[int]struct{}
 	gru           *gru.GRU
 	clusterId     int
-	clusters      map[int][]int
+	nodeToCluster map[int]int
 }
 
 func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *Node {
@@ -72,7 +72,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		subscribers:   make(map[int]struct{}),
 		gru:           gru,
 		clusterId:     -1,
-		clusters:      make(map[int][]int),
+		nodeToCluster: make(map[int]int),
 	}
 }
 
@@ -357,20 +357,14 @@ func (n *Node) advertiseCNN() {
 }
 
 func (n *Node) advertiseCluster() {
+	if n.PCH[d] == nil {
+		return
+	}
 	msg := messages.NewMessage(n.Id, messages.BcastId, messages.DefaultTTL, &messages.ClusterMessage{
 		SenderId:  n.Id,
 		ClusterId: n.PCH[d].Id,
 	})
 	n.sendMsg(msg)
-}
-func (n *Node) getNeighborIDS() []int {
-	ids := make([]int, len(n.DHopNeighbors))
-	i := 0
-	for id := range n.DHopNeighbors {
-		ids[i] = id
-		i++
-	}
-	return ids
 }
 
 // Beacon sends a beacon message to all neighbors.
@@ -443,24 +437,30 @@ func (n *Node) Start(ctx context.Context) {
 				}
 				n.rebcastBFSMessage(m, m.From)
 			case *messages.BFSResponseMessage:
-
 				if msg.Target != n.Id {
 					n.handleBFSResposneMessage(msg)
 					continue
 				}
 			case *messages.ClusterMessage:
-				if _, ok := n.clusters[msg.ClusterId]; !ok {
-					n.clusters[msg.ClusterId] = make([]int, 0)
+				if _, ok := n.nodeToCluster[msg.SenderId]; ok {
+					// node has new ch must rerun execptions??
+					continue
 				}
-				if !slices.Contains(n.clusters[msg.ClusterId], msg.SenderId) {
-					n.clusters[msg.ClusterId] = append(n.clusters[msg.ClusterId], msg.SenderId)
-				}
-
+				n.nodeToCluster[msg.SenderId] = msg.ClusterId
 			case *messages.ClusterRequestMessage:
 				n.sendMsg(messages.NewMessage(n.Id, m.From, messages.DefaultTTL, &messages.ClusterResponseMessage{
 					ClusterId: n.PCH[len(n.PCH)-1].Id,
 					SenderId:  n.Id,
 				}))
+			case *messages.ClusterResponseMessage:
+			case *messages.GetClusterRequest:
+				n.sendMsg(messages.NewMessage(n.Id, m.From, messages.DefaultTTL, &messages.GetClusterResponse{
+					ClusterId: n.PCH[len(n.PCH)-1].Id,
+					SenderId:  n.Id,
+				}))
+			case *messages.GetClusterResponse:
+			case *messages.CHFinalMessage:
+				n.PCH[len(n.PCH)-1] = &Node{Id: msg.ClusterId}
 			}
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
@@ -549,6 +549,15 @@ func (n *Node) RelativeMax(d int) {
 		n.PCH[1] = n.CNN[1]
 	} else {
 		n.PCH[1] = n.PCH[0]
+		// in case node chose itself as pch
+
+		for n.round = 2; n.round <= d; {
+			n.PCH[n.round] = n
+			n.CNN[n.round] = n
+			n.round++
+		}
+		n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
+		return
 	}
 
 	n.f.WriteString(fmt.Sprintf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id))
@@ -562,10 +571,7 @@ func (n *Node) RelativeMax(d int) {
 		n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 		newMsg := <-n.internalChan
 		cnnMessage, ok := newMsg.(*messages.CNNMessage)
-		if !ok {
-			continue
-		}
-		if cnnMessage.Round != n.round {
+		if !ok || cnnMessage.Round != n.round {
 			continue
 		}
 		cnn, ok := cnnMessage.CNN.(*Node)
@@ -616,50 +622,135 @@ func (n *Node) PCI() int {
 
 func (n *Node) Exception1() error {
 	potentialCh := n.PCH[len(n.PCH)-1]
-	if !n.IsCH() {
-		pathToCh := n.DistributedBFS(potentialCh.Id)
-		if len(pathToCh) == 0 {
-			return fmt.Errorf("[%d]: Can't reach CH: %d", n.Id, potentialCh.Id)
-		}
-		for _, nodeId := range pathToCh {
-			msg := messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.ClusterRequestMessage{
-				SenderId: n.Id,
-			})
-			n.sendMsg(msg)
-			for {
-				select {
-				case m := <-n.internalChan:
-					clusterMessage, ok := m.(*messages.ClusterResponseMessage)
-					if !ok || clusterMessage.SenderId != nodeId {
-						continue
-					}
-					if clusterMessage.ClusterId != potentialCh.Id {
-						n.f.WriteString(fmt.Sprintf("[%d]: Passing through: %d\n", n.Id, clusterMessage.ClusterId))
-						newPotentialPCH := clusterMessage.ClusterId
-						path := n.DistributedBFS(newPotentialPCH)
-						if len(path) >= 2 {
-							n.PCH[2] = n.CNN[1]
-							return nil
-						}
-						// TODO: change this to real node
-						n.PCH[2] = &Node{Id: newPotentialPCH}
+	if n.IsCH() {
+		return nil
+	}
+	pathToCh := n.DistributedBFS(potentialCh.Id)
+	if len(pathToCh) == 0 {
+		return fmt.Errorf("[%d]: Can't reach CH: %d", n.Id, potentialCh.Id)
+	}
+	for _, nodeId := range pathToCh {
+		n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.ClusterRequestMessage{
+			SenderId: n.Id,
+		}))
+	listenLoop:
+		for {
+			select {
+			case m := <-n.internalChan:
+				clusterMessage, ok := m.(*messages.ClusterResponseMessage)
+				if !ok || clusterMessage.SenderId != nodeId {
+					continue
+				}
+				if clusterMessage.ClusterId != potentialCh.Id {
+					n.f.WriteString(fmt.Sprintf("[%d]: Passing through: %d\n", n.Id, clusterMessage.ClusterId))
+					newPotentialPCH := clusterMessage.ClusterId
+					path := n.DistributedBFS(newPotentialPCH)
+					if len(path) >= 2 {
+						n.PCH[2] = n.CNN[1]
 						return nil
 					}
-				default:
-					time.Sleep(10 * time.Millisecond)
+					// TODO: change this to real node
+					n.PCH[2] = &Node{Id: newPotentialPCH}
+					return nil
 				}
+				break listenLoop
+			default:
+				time.Sleep(10 * time.Millisecond)
 			}
+		}
+	}
+
+	return nil
+}
+
+func (n *Node) getKnownCMs() []int {
+	clusterMembers := make([]int, 0)
+	for k, v := range n.nodeToCluster {
+		if v == n.Id {
+			clusterMembers = append(clusterMembers, k)
+		}
+	}
+	return clusterMembers
+}
+func (n *Node) sendToCluster(msg any) {
+	clusterMembers := n.getKnownCMs()
+	for _, memberId := range clusterMembers {
+		n.sendMsg(messages.NewMessage(n.Id, memberId, messages.DefaultTTL, msg))
+	}
+}
+
+func (n *Node) Exception2() error {
+	ch := n.PCH[len(n.PCH)-1].Id
+	clusterMembers := n.getKnownCMs()
+	if len(clusterMembers) == 0 {
+		return nil
+	}
+	// is selected as PCH by other members but not from itself
+	n.sendToCluster(&messages.CHRequestMessage{
+		SenderId:       n.Id,
+		NewPotentialCH: ch,
+	})
+listenLoop:
+	for idx := 0; idx < len(clusterMembers); {
+		select {
+		case msg := <-n.internalChan:
+			response, ok := msg.(*messages.CHResponseMessage)
+			if !ok {
+				continue listenLoop
+			}
+			// there is a member who cant satisfy distance d
+			// create new cluster with curr node as CH
+			if !response.Ok {
+				// send final CHMessage
+				n.sendToCluster(&messages.CHFinalMessage{
+					SenderId:  n.Id,
+					ClusterId: ch,
+				})
+				n.PCH[len(n.PCH)-1] = n
+			}
+			idx++
+			continue listenLoop
+		default:
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 	return nil
 }
 
-func (n *Node) Exception2() error {
-	if len(n.clusters[n.Id]) > 0 && n.PCH[len(n.PCH)-1].Id != n.Id {
-		// is selected as PCH by other members but not from itself
+func (n *Node) Exception3() error {
+	myCluster := n.getKnownCMs()
+	if len(myCluster) > 0 {
+		return nil
+	}
+	n.sendMsg(messages.NewMessage(n.Id, n.CNN[1].Id, messages.DefaultTTL, &messages.GetClusterRequest{
+		SenderId: n.Id,
+	}))
+
+	var newCh int
+listenLoop:
+	for {
+		select {
+		case msg := <-n.internalChan:
+			v, ok := msg.(*messages.GetClusterResponse)
+			if !ok {
+				continue listenLoop
+			}
+			newCh = v.ClusterId
+			break listenLoop
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
 
 	}
+
+	n.PCH[len(n.PCH)] = &Node{Id: newCh}
+
+	n.sendMsg(messages.NewMessage(n.Id, newCh, messages.DefaultTTL, &messages.ClusterMessage{
+		ClusterId: newCh,
+		SenderId:  n.Id,
+	}))
 	return nil
+
 }
 
 func (n *Node) Exceptions() error {
@@ -668,8 +759,13 @@ func (n *Node) Exceptions() error {
 		return err
 	}
 	// 2nd exception: Check if in node didn't select itself as CH
-
+	if err := n.Exception2(); err != nil {
+		return err
+	}
 	// 3nd exception: Check if cluster has members other than CH
+	if err := n.Exception3(); err != nil {
+		return err
+	}
 	return nil
 }
 

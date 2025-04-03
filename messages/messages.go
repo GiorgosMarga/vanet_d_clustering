@@ -49,7 +49,19 @@ type CNNMessage struct {
 type CHMessage struct {
 	CH int
 }
+type CHRequestMessage struct {
+	SenderId       int
+	NewPotentialCH int
+}
+type CHResponseMessage struct {
+	SenderId int
+	Ok       bool
+}
 
+type CHFinalMessage struct {
+	SenderId  int
+	ClusterId int
+}
 type SubscribeMsg struct {
 	SenderId int
 }
@@ -61,6 +73,15 @@ type EndRoundMessage struct {
 type ClusterMessage struct {
 	ClusterId int
 	SenderId  int
+}
+
+type GetClusterRequest struct {
+	SenderId int
+}
+
+type GetClusterResponse struct {
+	SenderId  int
+	ClusterId int
 }
 
 type WeightsMessage struct {

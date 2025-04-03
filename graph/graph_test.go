@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -115,4 +116,47 @@ func TestException1(t *testing.T) {
 	g.formClusters()
 	fmt.Println(g.clusters)
 
+}
+
+func TestExceptions(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	g, err := NewGraph(4, 2, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := g.ParseGraphFile("../snapshots/cars_65.txt", "\n\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	beaconCTX, beaconCancel := context.WithCancel(context.Background())
+
+	defer cancel()
+	defer beaconCancel()
+	fmt.Println(len(g.Nodes))
+	for _, n := range g.Nodes {
+		go n.Beacon(beaconCTX)
+		go n.Start(ctx)
+		wg.Add(1)
+		go func() {
+			n.RelativeMax(2)
+			wg.Done()
+		}()
+	}
+	fmt.Printf("%+v\n", wg)
+	wg.Wait()
+	fmt.Println("Finished Relative Max")
+	for _, n := range g.Nodes {
+		wg.Add(1)
+		go func() {
+			if err := n.Exceptions(); err != nil {
+				t.Error(err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	g.formClusters()
 }
