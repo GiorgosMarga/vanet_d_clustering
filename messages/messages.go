@@ -8,6 +8,7 @@ import (
 const (
 	DefaultTTL = 10 // rebroadcasts
 	BFSTTL     = 60
+	BcastId    = -1
 )
 
 type Message struct {
@@ -59,8 +60,7 @@ type EndRoundMessage struct {
 
 type ClusterMessage struct {
 	ClusterId int
-	IsCh      bool
-	Sender    int
+	SenderId  int
 }
 
 type WeightsMessage struct {
@@ -73,7 +73,13 @@ type ClusterWeightsMessage struct {
 	AverageWeights [][][]float64
 }
 
-type FindClusterMessage struct {
+type ClusterRequestMessage struct {
+	SenderId int
+}
+
+type ClusterResponseMessage struct {
+	SenderId  int
+	ClusterId int
 }
 
 type BFSRequestMessage struct {
@@ -97,13 +103,6 @@ func NewWeightsMessage(senderId int, weights [][][]float64) *WeightsMessage {
 	}
 }
 
-func NewClusterMessage(clusterId, sender int, isCh bool) *ClusterMessage {
-	return &ClusterMessage{
-		ClusterId: clusterId,
-		IsCh:      isCh,
-		Sender:    sender,
-	}
-}
 func NewBeaconMessage(velocity, posx, posy, angle float64, senderId, degree, round, pci int) *BeaconMessage {
 	return &BeaconMessage{
 		Velocity: velocity,

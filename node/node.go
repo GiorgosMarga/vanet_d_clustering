@@ -23,6 +23,7 @@ const (
 	InputSize           = 4
 	Epochs              = 5
 	BatchSize           = 10
+	d                   = 2 // TODO: change this
 )
 
 type Node struct {
@@ -35,12 +36,13 @@ type Node struct {
 	CNN           []*Node
 	PCH           []*Node
 	msgChan       chan *messages.Message
-	finishChan    chan struct{}
 	internalChan  chan any
 	f             *os.File
 	round         int
 	subscribers   map[int]struct{}
 	gru           *gru.GRU
+	clusterId     int
+	clusters      map[int][]int
 }
 
 func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *Node {
@@ -65,11 +67,12 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		msgChan:       make(chan *messages.Message, 1000), //TODO: change this
 		internalChan:  make(chan any, 1000),
 		round:         1,
-		finishChan:    make(chan struct{}),
 		f:             f,
 		DHopNeighbors: make(map[int]*Node),
 		subscribers:   make(map[int]struct{}),
 		gru:           gru,
+		clusterId:     -1,
+		clusters:      make(map[int][]int),
 	}
 }
 
@@ -296,6 +299,9 @@ func (n *Node) bcast(msg *messages.Message) {
 	m.Ttl--
 
 	for _, cn := range n.DHopNeighbors {
+		if cn.Id == m.To {
+			continue
+		}
 		timer := time.NewTimer(500 * time.Millisecond)
 		select {
 		case cn.msgChan <- &m:
@@ -351,18 +357,11 @@ func (n *Node) advertiseCNN() {
 }
 
 func (n *Node) advertiseCluster() {
-	d := len(n.PCH) - 1
-	if n.PCH[d] == nil {
-		return
-	}
-	for subId := range n.DHopNeighbors {
-		msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.ClusterMessage{
-			Sender:    n.Id,
-			ClusterId: n.PCH[d].Id,
-			IsCh:      n.IsCH(),
-		})
-		n.sendMsg(msg)
-	}
+	msg := messages.NewMessage(n.Id, messages.BcastId, messages.DefaultTTL, &messages.ClusterMessage{
+		SenderId:  n.Id,
+		ClusterId: n.PCH[d].Id,
+	})
+	n.sendMsg(msg)
 }
 func (n *Node) getNeighborIDS() []int {
 	ids := make([]int, len(n.DHopNeighbors))
@@ -449,6 +448,19 @@ func (n *Node) Start(ctx context.Context) {
 					n.handleBFSResposneMessage(msg)
 					continue
 				}
+			case *messages.ClusterMessage:
+				if _, ok := n.clusters[msg.ClusterId]; !ok {
+					n.clusters[msg.ClusterId] = make([]int, 0)
+				}
+				if !slices.Contains(n.clusters[msg.ClusterId], msg.SenderId) {
+					n.clusters[msg.ClusterId] = append(n.clusters[msg.ClusterId], msg.SenderId)
+				}
+
+			case *messages.ClusterRequestMessage:
+				n.sendMsg(messages.NewMessage(n.Id, m.From, messages.DefaultTTL, &messages.ClusterResponseMessage{
+					ClusterId: n.PCH[len(n.PCH)-1].Id,
+					SenderId:  n.Id,
+				}))
 			}
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
@@ -602,9 +614,59 @@ func (n *Node) PCI() int {
 	return len(pciTable)
 }
 
+func (n *Node) Exception1() error {
+	potentialCh := n.PCH[len(n.PCH)-1]
+	if !n.IsCH() {
+		pathToCh := n.DistributedBFS(potentialCh.Id)
+		if len(pathToCh) == 0 {
+			return fmt.Errorf("[%d]: Can't reach CH: %d", n.Id, potentialCh.Id)
+		}
+		for _, nodeId := range pathToCh {
+			msg := messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.ClusterRequestMessage{
+				SenderId: n.Id,
+			})
+			n.sendMsg(msg)
+			for {
+				select {
+				case m := <-n.internalChan:
+					clusterMessage, ok := m.(*messages.ClusterResponseMessage)
+					if !ok || clusterMessage.SenderId != nodeId {
+						continue
+					}
+					if clusterMessage.ClusterId != potentialCh.Id {
+						n.f.WriteString(fmt.Sprintf("[%d]: Passing through: %d\n", n.Id, clusterMessage.ClusterId))
+						newPotentialPCH := clusterMessage.ClusterId
+						path := n.DistributedBFS(newPotentialPCH)
+						if len(path) >= 2 {
+							n.PCH[2] = n.CNN[1]
+							return nil
+						}
+						// TODO: change this to real node
+						n.PCH[2] = &Node{Id: newPotentialPCH}
+						return nil
+					}
+				default:
+					time.Sleep(10 * time.Millisecond)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (n *Node) Exception2() error {
+	if len(n.clusters[n.Id]) > 0 && n.PCH[len(n.PCH)-1].Id != n.Id {
+		// is selected as PCH by other members but not from itself
+
+	}
+	return nil
+}
+
 func (n *Node) Exceptions() error {
 	// 1st exception: Check if in my path to CH there is no other cluster
-
+	if err := n.Exception1(); err != nil {
+		return err
+	}
 	// 2nd exception: Check if in node didn't select itself as CH
 
 	// 3nd exception: Check if cluster has members other than CH
@@ -674,5 +736,3 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 	}
 	return []*Node{}
 }
-
-
