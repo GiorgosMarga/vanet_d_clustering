@@ -475,6 +475,13 @@ func (n *Node) RelativeMax(d int) {
 		n.PCH[1] = n.CNN[1]
 	} else {
 		n.PCH[1] = n.PCH[0]
+
+		for n.round = 2; n.round <= d; n.round++ {
+			n.PCH[n.round] = n
+			n.CNN[n.round] = n
+			n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
+		}
+
 	}
 
 	n.f.WriteString(fmt.Sprintf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id))
@@ -488,10 +495,7 @@ func (n *Node) RelativeMax(d int) {
 		n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 		newMsg := <-n.internalChan
 		cnnMessage, ok := newMsg.(*messages.CNNMessage)
-		if !ok {
-			continue
-		}
-		if cnnMessage.Round != n.round {
+		if !ok || cnnMessage.Round != n.round || cnnMessage.SenderId != n.PCH[n.round-1].Id {
 			continue
 		}
 		cnn, ok := cnnMessage.CNN.(*Node)
