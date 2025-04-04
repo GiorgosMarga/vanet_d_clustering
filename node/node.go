@@ -6,12 +6,14 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"time"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/gru"
 	"github.com/GiorgosMarga/vanet_d_clustering/messages"
+	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
 const (
@@ -50,7 +52,8 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 	}
 
 	gru := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, 0.001)
-	if err := gru.ParseFile(fmt.Sprintf("./data/car_%d.txt", id%60)); err != nil {
+
+	if err := gru.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
 		panic(err)
 	}
 
@@ -296,6 +299,9 @@ func (n *Node) bcast(msg *messages.Message) {
 	m.Ttl--
 
 	for _, cn := range n.DHopNeighbors {
+		if m.From == cn.Id {
+			continue
+		}
 		timer := time.NewTimer(500 * time.Millisecond)
 		select {
 		case cn.msgChan <- &m:
@@ -481,7 +487,7 @@ func (n *Node) RelativeMax(d int) {
 			n.CNN[n.round] = n
 			n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
 		}
-
+		return
 	}
 
 	n.f.WriteString(fmt.Sprintf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id))

@@ -56,7 +56,6 @@ func main() {
 			fmt.Println(err)
 			continue
 		}
-
 		g.DHCV()
 		if err := g.PlotGraph(fmt.Sprintf("graphviz/%s.dot", filename), d); err != nil {
 			log.Fatal("Plot error:", err)
