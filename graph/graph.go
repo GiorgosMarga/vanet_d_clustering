@@ -6,12 +6,14 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/node"
+	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
 var colors = []string{
@@ -34,14 +36,15 @@ type Graph struct {
 }
 
 func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
-	f, err := os.OpenFile("../graph_info/graph.info", os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
+
+	f, err := os.OpenFile(filepath.Join(utils.GetProjectRoot(), "graph_info", "graph.info"), os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 	pool := make(map[int]*node.Node)
 
 	for id := range numOfNodes {
-		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, fmt.Sprintf("../cars_info/car_%d.info", id))
+		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", id)))
 	}
 	fmt.Printf("Initialized %d nodes\n", numOfNodes)
 	return &Graph{
@@ -98,8 +101,9 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		if !ok {
 			n = g.PoolOfNodes[nodeId]
 		}
+
 		if n == nil {
-			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], fmt.Sprintf("./cars_info/car_%d.info", nodeId))
+			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", nodeId)))
 			g.AddNode(n)
 			continue
 		}

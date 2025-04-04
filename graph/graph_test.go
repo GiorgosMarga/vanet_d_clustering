@@ -3,11 +3,14 @@ package graph
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/node"
+	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
 func TestDistributedBFS(t *testing.T) {
@@ -16,7 +19,7 @@ func TestDistributedBFS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := g.ParseGraphFile("../snapshots/cars_65.txt", "\n\n"); err != nil {
+	if err := g.ParseGraphFile("../snapshots/cars_15.txt", "\n\n"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -28,14 +31,14 @@ func TestDistributedBFS(t *testing.T) {
 		go n.Start(ctx)
 	}
 
-	startNode, ok := g.Nodes[8]
+	startNode, ok := g.Nodes[3]
 
 	if !ok {
 		t.FailNow()
 	}
 
-	fmt.Println(node.PrintPath(startNode.FindPath(g.Nodes[45])))
-	fmt.Println(startNode.DistributedBFS(45))
+	fmt.Println(node.PrintPath(startNode.FindPath(g.Nodes[5])))
+	fmt.Println(startNode.DistributedBFS(5))
 
 }
 
@@ -125,7 +128,7 @@ func TestExceptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := g.ParseGraphFile("../snapshots/cars_65.txt", "\n\n"); err != nil {
+	if err := g.ParseGraphFile("../snapshots/cars_10.txt", "\n\n"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,7 +137,6 @@ func TestExceptions(t *testing.T) {
 
 	defer cancel()
 	defer beaconCancel()
-	fmt.Println(len(g.Nodes))
 	for _, n := range g.Nodes {
 		go n.Beacon(beaconCTX)
 		go n.Start(ctx)
@@ -144,7 +146,6 @@ func TestExceptions(t *testing.T) {
 			wg.Done()
 		}()
 	}
-	fmt.Printf("%+v\n", wg)
 	wg.Wait()
 	fmt.Println("Finished Relative Max")
 	for _, n := range g.Nodes {
@@ -159,4 +160,68 @@ func TestExceptions(t *testing.T) {
 	wg.Wait()
 
 	g.formClusters()
+	fmt.Println(g.clusters)
+}
+
+func TestDHCVWithExceptions(t *testing.T) {
+	f, err := os.ReadDir("../snapshots")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	g, err := NewGraph(4, 2, 60)
+	if err != nil {
+		log.Fatal(err)
+	}
+	d := 2
+
+	graphPath := "../snapshots"
+	wg := &sync.WaitGroup{}
+	for _, snapshot := range f {
+		filename := utils.GetFileName(snapshot.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+		g.Log(fmt.Sprintf("------------%s----------\n", filename))
+		if err := g.ParseGraphFile(fmt.Sprintf("%s/%s", graphPath, snapshot.Name()), "\n\n"); err != nil {
+			fmt.Println(err)
+			continue
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		beaconCTX, beaconCancel := context.WithCancel(context.Background())
+
+		for _, n := range g.Nodes {
+			go n.Beacon(beaconCTX)
+			go n.Start(ctx)
+			wg.Add(1)
+			go func() {
+				n.RelativeMax(2)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		fmt.Println("Finished Relative Max")
+		for _, n := range g.Nodes {
+			wg.Add(1)
+			go func() {
+				if err := n.Exceptions(); err != nil {
+					fmt.Println(err)
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		g.formClusters()
+		if err := g.PlotGraph(fmt.Sprintf("../graphviz/%s.dot", filename), d); err != nil {
+			log.Fatal("Plot error:", err)
+		}
+		if err := g.GenerateSUMOFile(fmt.Sprintf("../sumo/%s.sumo", filename)); err != nil {
+			log.Fatal("Generating SUMO:", err)
+		}
+		fmt.Printf("Filename: %s -> Connectivity: %d%% | Clusters: %d | AverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
+
+		cancel()
+		beaconCancel()
+		time.Sleep(1 * time.Second)
+	}
 }

@@ -6,12 +6,14 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"time"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/gru"
 	"github.com/GiorgosMarga/vanet_d_clustering/messages"
+	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
 const (
@@ -21,7 +23,7 @@ const (
 	TrainSizePercentage = 0.8
 	HiddenStateSize     = 16
 	InputSize           = 4
-	Epochs              = 5
+	Epochs              = 30
 	BatchSize           = 10
 	d                   = 2 // TODO: change this
 )
@@ -52,7 +54,8 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 	}
 
 	gru := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, 0.001)
-	if err := gru.ParseFile(fmt.Sprintf("../data/car_%d.txt", id%60)); err != nil {
+
+	if err := gru.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
 		panic(err)
 	}
 
@@ -89,6 +92,8 @@ func (n *Node) ResetNode() {
 	n.CNN = make([]*Node, len(n.CNN))
 	n.DHopNeighbors = make(map[int]*Node)
 	n.subscribers = make(map[int]struct{})
+	n.nodeToCluster = make(map[int]int)
+	n.clusterId = -1
 }
 
 func (n *Node) SendWeights() {
@@ -117,7 +122,6 @@ func (n *Node) Train() error {
 
 	trainSize := int(float64(len(n.gru.X)) * TrainSizePercentage)
 
-	n.f.WriteString(fmt.Sprintf("Training node %d\n", n.Id))
 	if err := n.gru.Train(n.gru.X[:trainSize], n.gru.Y[:trainSize], Epochs, BatchSize); err != nil {
 		return err
 	}
@@ -218,11 +222,9 @@ outerLoop:
 			if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
 				panic(err)
 			}
-			n.f.WriteString(fmt.Sprintf("CH: %d, Weights: %v\n", n.Id, weightsMessage.Weights))
 			break outerLoop
 		case <-timer.C:
 			fmt.Printf("[%d]: Did not receive weights\n", n.Id)
-			n.printPCH(len(n.PCH))
 			break outerLoop
 
 		}
@@ -299,7 +301,7 @@ func (n *Node) bcast(msg *messages.Message) {
 	m.Ttl--
 
 	for _, cn := range n.DHopNeighbors {
-		if cn.Id == m.To {
+		if cn.Id == m.From {
 			continue
 		}
 		timer := time.NewTimer(500 * time.Millisecond)
@@ -407,6 +409,7 @@ func (n *Node) Start(ctx context.Context) {
 				n.bcast(m)
 				continue
 			}
+
 			switch msg := m.Msg.(type) {
 			case *messages.BeaconMessage:
 				// since we update the nodes, the channel may still have a messages from previous snapshot
@@ -436,6 +439,7 @@ func (n *Node) Start(ctx context.Context) {
 					continue
 				}
 				n.rebcastBFSMessage(m, m.From)
+				continue
 			case *messages.BFSResponseMessage:
 				if msg.Target != n.Id {
 					n.handleBFSResposneMessage(msg)
@@ -443,24 +447,32 @@ func (n *Node) Start(ctx context.Context) {
 				}
 			case *messages.ClusterMessage:
 				if _, ok := n.nodeToCluster[msg.SenderId]; ok {
-					// node has new ch must rerun execptions??
+					//TODO: node has new ch must rerun execptions??
 					continue
 				}
 				n.nodeToCluster[msg.SenderId] = msg.ClusterId
+				continue
 			case *messages.ClusterRequestMessage:
-				n.sendMsg(messages.NewMessage(n.Id, m.From, messages.DefaultTTL, &messages.ClusterResponseMessage{
+				if n.PCH[len(n.PCH)-1] == nil {
+					continue
+				}
+				n.sendMsg(messages.NewMessage(n.Id, msg.SenderId, messages.DefaultTTL, &messages.ClusterResponseMessage{
 					ClusterId: n.PCH[len(n.PCH)-1].Id,
 					SenderId:  n.Id,
 				}))
+				continue
 			case *messages.ClusterResponseMessage:
-			case *messages.GetClusterRequest:
-				n.sendMsg(messages.NewMessage(n.Id, m.From, messages.DefaultTTL, &messages.GetClusterResponse{
-					ClusterId: n.PCH[len(n.PCH)-1].Id,
-					SenderId:  n.Id,
-				}))
-			case *messages.GetClusterResponse:
 			case *messages.CHFinalMessage:
+				n.f.WriteString(fmt.Sprintf("[%d]: Received final CH message from %d for %d\n", n.Id, msg.SenderId, msg.ClusterId))
 				n.PCH[len(n.PCH)-1] = &Node{Id: msg.ClusterId}
+			case *messages.CHRequestMessage:
+				newCh := msg.NewPotentialCH
+				path := n.DistributedBFS(newCh)
+				n.sendMsg(messages.NewMessage(n.Id, msg.SenderId, messages.DefaultTTL, &messages.CHResponseMessage{
+					SenderId: n.Id,
+					Ok:       len(path) <= d,
+				}))
+				continue
 			}
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
@@ -629,31 +641,41 @@ func (n *Node) Exception1() error {
 	if len(pathToCh) == 0 {
 		return fmt.Errorf("[%d]: Can't reach CH: %d", n.Id, potentialCh.Id)
 	}
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
 	for _, nodeId := range pathToCh {
 		n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.ClusterRequestMessage{
 			SenderId: n.Id,
 		}))
+
 	listenLoop:
 		for {
 			select {
 			case m := <-n.internalChan:
 				clusterMessage, ok := m.(*messages.ClusterResponseMessage)
-				if !ok || clusterMessage.SenderId != nodeId {
-					continue
+				if !ok {
+					continue listenLoop
+				}
+				if clusterMessage.SenderId != nodeId {
+					continue listenLoop
 				}
 				if clusterMessage.ClusterId != potentialCh.Id {
-					n.f.WriteString(fmt.Sprintf("[%d]: Passing through: %d\n", n.Id, clusterMessage.ClusterId))
+
 					newPotentialPCH := clusterMessage.ClusterId
 					path := n.DistributedBFS(newPotentialPCH)
 					if len(path) >= 2 {
+						n.f.WriteString(fmt.Sprintf("[%d]: New cPCH: %d\n", n.Id, n.CNN[1].Id))
 						n.PCH[2] = n.CNN[1]
 						return nil
 					}
 					// TODO: change this to real node
 					n.PCH[2] = &Node{Id: newPotentialPCH}
+					n.f.WriteString(fmt.Sprintf("[%d]: New PCH: %d\n", n.Id, n.PCH[2].Id))
 					return nil
 				}
 				break listenLoop
+			case <-timer.C:
+				return fmt.Errorf("[%d]: Timeout 1", n.Id)
 			default:
 				time.Sleep(10 * time.Millisecond)
 			}
@@ -681,15 +703,25 @@ func (n *Node) sendToCluster(msg any) {
 
 func (n *Node) Exception2() error {
 	ch := n.PCH[len(n.PCH)-1].Id
+
+	// node did select itself
+	if n.IsCH() {
+		return nil
+	}
+
 	clusterMembers := n.getKnownCMs()
 	if len(clusterMembers) == 0 {
 		return nil
 	}
+	//
+	n.f.WriteString(fmt.Sprintf("Cluster Members: %v\n", clusterMembers))
 	// is selected as PCH by other members but not from itself
 	n.sendToCluster(&messages.CHRequestMessage{
 		SenderId:       n.Id,
 		NewPotentialCH: ch,
 	})
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
 listenLoop:
 	for idx := 0; idx < len(clusterMembers); {
 		select {
@@ -706,10 +738,15 @@ listenLoop:
 					SenderId:  n.Id,
 					ClusterId: ch,
 				})
+				n.f.WriteString(fmt.Sprintf("[%d]: new ch: %d\n", n.Id, n.Id))
 				n.PCH[len(n.PCH)-1] = n
+				return nil
 			}
 			idx++
 			continue listenLoop
+		case <-timer.C:
+			n.f.WriteString(fmt.Sprintf("[%d]: Timeout 2\n", n.Id))
+			return fmt.Errorf("[%d]: Timeout 2", n.Id)
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -718,32 +755,40 @@ listenLoop:
 }
 
 func (n *Node) Exception3() error {
+	if !n.IsCH() {
+		return nil
+	}
 	myCluster := n.getKnownCMs()
 	if len(myCluster) > 0 {
 		return nil
 	}
-	n.sendMsg(messages.NewMessage(n.Id, n.CNN[1].Id, messages.DefaultTTL, &messages.GetClusterRequest{
+	n.sendMsg(messages.NewMessage(n.Id, n.CNN[1].Id, messages.DefaultTTL, &messages.ClusterRequestMessage{
 		SenderId: n.Id,
 	}))
 
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
 	var newCh int
 listenLoop:
 	for {
 		select {
 		case msg := <-n.internalChan:
-			v, ok := msg.(*messages.GetClusterResponse)
+			v, ok := msg.(*messages.ClusterResponseMessage)
 			if !ok {
 				continue listenLoop
 			}
 			newCh = v.ClusterId
 			break listenLoop
+		case <-timer.C:
+			return fmt.Errorf("[%d]: Timeout 3", n.Id)
+
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
 
 	}
 
-	n.PCH[len(n.PCH)] = &Node{Id: newCh}
+	n.PCH[len(n.PCH)-1] = &Node{Id: newCh}
 
 	n.sendMsg(messages.NewMessage(n.Id, newCh, messages.DefaultTTL, &messages.ClusterMessage{
 		ClusterId: newCh,
@@ -754,15 +799,19 @@ listenLoop:
 }
 
 func (n *Node) Exceptions() error {
+
 	// 1st exception: Check if in my path to CH there is no other cluster
 	if err := n.Exception1(); err != nil {
 		return err
 	}
+
 	// 2nd exception: Check if in node didn't select itself as CH
 	if err := n.Exception2(); err != nil {
 		return err
 	}
-	// 3nd exception: Check if cluster has members other than CH
+
+	// 3nd exception: Check if cluster has no members other than CH
+
 	if err := n.Exception3(); err != nil {
 		return err
 	}
@@ -781,7 +830,7 @@ func (n *Node) DistributedBFS(targetNode int) []int {
 		})
 		n.sendMsg(msg)
 	}
-	timer := time.NewTimer(1 * time.Minute)
+	timer := time.NewTimer(100 * time.Millisecond)
 	for {
 		select {
 		case m := <-n.internalChan:
