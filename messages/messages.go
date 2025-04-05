@@ -29,6 +29,7 @@ func NewMessage(from, to, ttl int, msg any) *Message {
 	}
 }
 
+// BeaconMessage is used for sending the position and velocity of the node.
 type BeaconMessage struct {
 	Velocity float64
 	PosX     float64
@@ -40,28 +41,34 @@ type BeaconMessage struct {
 	PCI      int
 }
 
+// CNNMessage is used for sending the CNN node for round >=1 in relative max.
 type CNNMessage struct {
 	SenderId int
 	CNN      any
 	Round    int
 }
 
-type CHMessage struct {
-	CH int
-}
+// CHRequestMessage is used for asking a node to have a new ch.
+// It is used in exception 2
 type CHRequestMessage struct {
 	SenderId       int
 	NewPotentialCH int
 }
+
+// CHResponseMessage is used for responding to the request.
+// Ok is true if distance d is satisfied
 type CHResponseMessage struct {
 	SenderId int
 	Ok       bool
 }
 
+// CHFinalMessage is used for sending the final CH of a node after exception 2.
 type CHFinalMessage struct {
 	SenderId  int
 	ClusterId int
 }
+
+// SubscribeMsg is used for subscribing to a node to receive CNN messages from it.Used in relative max.
 type SubscribeMsg struct {
 	SenderId int
 }
@@ -70,39 +77,37 @@ type EndRoundMessage struct {
 	Round int
 }
 
+// ClusterMessage is used for sending the cluster id of a node.
+// It is bcasted periodically from each node
 type ClusterMessage struct {
 	ClusterId int
 	SenderId  int
 }
 
+// GetClusterRequest is sent to learn the CH of a node.
 type GetClusterRequest struct {
 	SenderId int
 }
 
+// GetClusterResponse is the response to the GetClusterRequest
 type GetClusterResponse struct {
 	SenderId  int
 	ClusterId int
 }
 
+// WeightsMessage is sent from nodes to ch
 type WeightsMessage struct {
 	SenderId int
 	Weights  [][][]float64
 }
 
+// ClusterWeightsMessage is sent from ch to ch, to calculate the average
 type ClusterWeightsMessage struct {
 	SenderId       int
 	AverageWeights [][][]float64
 }
 
-type ClusterRequestMessage struct {
-	SenderId int
-}
-
-type ClusterResponseMessage struct {
-	SenderId  int
-	ClusterId int
-}
-
+// BFSRequestMessage is used to find a path between 2 nodes
 type BFSRequestMessage struct {
 	SenderId int
 	Level    int
@@ -111,42 +116,9 @@ type BFSRequestMessage struct {
 	Target   int
 }
 
+// BFSResponseMessage is sent from target node back to the first node
 type BFSResponseMessage struct {
 	Level  int
 	Path   []int
 	Target int
-}
-
-func NewWeightsMessage(senderId int, weights [][][]float64) *WeightsMessage {
-	return &WeightsMessage{
-		SenderId: senderId,
-		Weights:  weights,
-	}
-}
-
-func NewBeaconMessage(velocity, posx, posy, angle float64, senderId, degree, round, pci int) *BeaconMessage {
-	return &BeaconMessage{
-		Velocity: velocity,
-		PosX:     posx,
-		PosY:     posy,
-		Degree:   degree,
-		Angle:    angle,
-		SenderId: senderId,
-		Round:    round,
-		PCI:      pci,
-	}
-}
-
-func NewCNNMessage(cnn any, senderId, round int) *CNNMessage {
-	return &CNNMessage{
-		SenderId: senderId,
-		CNN:      cnn,
-		Round:    round,
-	}
-}
-
-func NewSubscribeMessage(senderId int) *SubscribeMsg {
-	return &SubscribeMsg{
-		SenderId: senderId,
-	}
 }
