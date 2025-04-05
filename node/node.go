@@ -92,7 +92,7 @@ func (n *Node) ResetNode() {
 }
 
 func (n *Node) SendWeights() {
-	n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, messages.NewWeightsMessage(n.Id, n.gru.GetWeights())))
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: n.gru.GetWeights()}))
 }
 func PrintPath(path []*Node) string {
 	s := ""
@@ -194,7 +194,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
 		for _, nodeId := range myCluster {
 			if nodeId != n.Id {
-				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, messages.NewWeightsMessage(n.Id, totalAverage)))
+				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: totalAverage}))
 			}
 		}
 		if err := n.gru.SetWeights(totalAverage); err != nil {
@@ -427,6 +427,7 @@ func (n *Node) Start(ctx context.Context, d int) {
 			case *messages.SubscribeMsg:
 				senderId := m.Msg.(*messages.SubscribeMsg).SenderId
 				n.subscribers[senderId] = struct{}{}
+				continue
 			case *messages.WeightsMessage:
 			case *messages.ClusterWeightsMessage:
 			}
@@ -450,8 +451,7 @@ func (n *Node) RelativeMax(d int) {
 			n.CNN[i] = n
 			n.PCH[i] = n
 		}
-
-		return
+		panic("No neighbors")
 	}
 
 	// In the first round, each node finds the CNN based on it's neighborhood.
@@ -493,7 +493,7 @@ func (n *Node) RelativeMax(d int) {
 	n.f.WriteString(fmt.Sprintf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id))
 
 	// Each node has to subscribe to its potential pch to be able to receive CNN messages
-	subMsg := messages.NewMessage(n.Id, n.PCH[1].Id, messages.DefaultTTL, messages.NewSubscribeMessage(n.Id))
+	subMsg := messages.NewMessage(n.Id, n.PCH[1].Id, messages.DefaultTTL, &messages.SubscribeMsg{SenderId: n.Id})
 	n.sendMsg(subMsg)
 
 	// for the rest of the rounds the CNN is selected based on what the previous CNN has selected
