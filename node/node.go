@@ -28,21 +28,22 @@ const (
 )
 
 type Node struct {
-	Id            int
-	DHopNeighbors map[int]*Node
-	Velocity      float64
-	PosX          float64
-	PosY          float64
-	Angle         float64
-	CNN           []*Node
-	PCH           []*Node
-	msgChan       chan *messages.Message
-	finishChan    chan struct{}
-	internalChan  chan any
-	f             *os.File
-	round         int
-	subscribers   map[int]struct{}
-	gru           *gru.GRU
+	Id             int
+	DHopNeighbors  map[int]*Node
+	Velocity       float64
+	PosX           float64
+	PosY           float64
+	Angle          float64
+	CNN            []*Node
+	PCH            []*Node
+	msgChan        chan *messages.Message
+	finishChan     chan struct{}
+	internalChan   chan any
+	f              *os.File
+	round          int
+	subscribers    map[int]struct{}
+	gru            *gru.GRU
+	weightMessages map[int]*messages.WeightsMessage
 }
 
 func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *Node {
@@ -58,21 +59,22 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 	}
 
 	return &Node{
-		Id:            id,
-		Velocity:      velocity,
-		PosX:          posx,
-		PosY:          posy,
-		Angle:         angle,
-		CNN:           make([]*Node, d+1),
-		PCH:           make([]*Node, d+1),
-		msgChan:       make(chan *messages.Message, 1000), //TODO: change this
-		internalChan:  make(chan any, 1000),
-		round:         1,
-		finishChan:    make(chan struct{}),
-		f:             f,
-		DHopNeighbors: make(map[int]*Node),
-		subscribers:   make(map[int]struct{}),
-		gru:           gru,
+		Id:             id,
+		Velocity:       velocity,
+		PosX:           posx,
+		PosY:           posy,
+		Angle:          angle,
+		CNN:            make([]*Node, d+1),
+		PCH:            make([]*Node, d+1),
+		msgChan:        make(chan *messages.Message, 1000), //TODO: change this
+		internalChan:   make(chan any, 1000),
+		round:          1,
+		finishChan:     make(chan struct{}),
+		f:              f,
+		DHopNeighbors:  make(map[int]*Node),
+		subscribers:    make(map[int]struct{}),
+		gru:            gru,
+		weightMessages: make(map[int]*messages.WeightsMessage),
 	}
 }
 
