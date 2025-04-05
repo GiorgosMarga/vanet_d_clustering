@@ -212,6 +212,9 @@ func TestDHCVWithExceptions(t *testing.T) {
 		}
 		wg.Wait()
 		g.formClusters()
+
+		g.Log(fmt.Sprintf("Clusters: %v\n", g.clusters))
+
 		if err := g.PlotGraph(fmt.Sprintf("../graphviz/%s.dot", filename), d); err != nil {
 			log.Fatal("Plot error:", err)
 		}
@@ -222,6 +225,5 @@ func TestDHCVWithExceptions(t *testing.T) {
 
 		cancel()
 		beaconCancel()
-		time.Sleep(1 * time.Second)
 	}
 }

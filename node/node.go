@@ -267,7 +267,7 @@ func (n *Node) Degree() int {
 }
 func (n *Node) IsCH() bool {
 	if n.PCH[len(n.PCH)-1] == nil {
-		panic(fmt.Sprintf("[%d]: %+v\n", n.Id, n.PCH))
+		return false
 	}
 	return n.PCH[len(n.PCH)-1].Id == n.Id
 }
@@ -407,7 +407,10 @@ func (n *Node) Start(ctx context.Context) {
 			}
 			if m.To != n.Id {
 				n.bcast(m)
-				continue
+				if m.To != messages.BcastId {
+					continue
+				}
+
 			}
 
 			switch msg := m.Msg.(type) {
@@ -442,16 +445,15 @@ func (n *Node) Start(ctx context.Context) {
 				continue
 			case *messages.BFSResponseMessage:
 				if msg.Target != n.Id {
-					n.handleBFSResposneMessage(msg)
+					n.handleBFSResponseMessage(msg)
 					continue
 				}
 			case *messages.ClusterMessage:
-				if _, ok := n.nodeToCluster[msg.SenderId]; ok {
-					//TODO: node has new ch must rerun execptions??
-					continue
-				}
 				n.nodeToCluster[msg.SenderId] = msg.ClusterId
-				continue
+				if msg.ClusterId == n.Id {
+					n.f.WriteString(fmt.Sprintf("[%d]: Received cluster message from %d\n", n.Id, msg.SenderId))
+					n.Exception2()
+				}
 			case *messages.ClusterRequestMessage:
 				if n.PCH[len(n.PCH)-1] == nil {
 					continue
@@ -513,7 +515,7 @@ func (n *Node) rebcastBFSMessage(msg *messages.Message, senderId int) {
 	}
 }
 
-func (n *Node) handleBFSResposneMessage(msg *messages.BFSResponseMessage) {
+func (n *Node) handleBFSResponseMessage(msg *messages.BFSResponseMessage) {
 	m := *msg
 	to := m.Path[msg.Level]
 	m.Level = msg.Level - 1
@@ -521,6 +523,7 @@ func (n *Node) handleBFSResposneMessage(msg *messages.BFSResponseMessage) {
 }
 
 func (n *Node) RelativeMax(d int) {
+
 	n.CNN[0] = n
 	n.PCH[0] = n
 
@@ -643,7 +646,10 @@ func (n *Node) Exception1() error {
 	}
 	timer := time.NewTimer(1 * time.Second)
 	defer timer.Stop()
+	n.f.WriteString(fmt.Sprintf("[%d]: Path to CH: %v\n", n.Id, pathToCh))
 	for _, nodeId := range pathToCh {
+		n.f.WriteString(fmt.Sprintf("[%d]: Waiting for : %v\n", n.Id, nodeId))
+
 		n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.ClusterRequestMessage{
 			SenderId: n.Id,
 		}))
@@ -660,12 +666,16 @@ func (n *Node) Exception1() error {
 					continue listenLoop
 				}
 				if clusterMessage.ClusterId != potentialCh.Id {
-
 					newPotentialPCH := clusterMessage.ClusterId
 					path := n.DistributedBFS(newPotentialPCH)
-					if len(path) >= 2 {
+					n.f.WriteString(fmt.Sprintf("[%d]: New potential PCH: %d, path: %v\n", n.Id, newPotentialPCH, path))
+					if len(path) > 2 {
 						n.f.WriteString(fmt.Sprintf("[%d]: New cPCH: %d\n", n.Id, n.CNN[1].Id))
 						n.PCH[2] = n.CNN[1]
+						n.sendMsg(messages.NewMessage(n.Id, n.CNN[1].Id, messages.DefaultTTL, &messages.ClusterMessage{
+							SenderId:  n.Id,
+							ClusterId: n.CNN[1].Id,
+						}))
 						return nil
 					}
 					// TODO: change this to real node
@@ -702,6 +712,9 @@ func (n *Node) sendToCluster(msg any) {
 }
 
 func (n *Node) Exception2() error {
+	if n.PCH[len(n.PCH)-1] == nil {
+		return nil
+	}
 	ch := n.PCH[len(n.PCH)-1].Id
 
 	// node did select itself
@@ -751,6 +764,12 @@ listenLoop:
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
+
+	n.sendToCluster(&messages.CHFinalMessage{
+		SenderId:  n.Id,
+		ClusterId: n.Id,
+	})
+	n.f.WriteString(fmt.Sprintf("[%d]: remain ch: %d\n", n.Id, n.Id))
 	return nil
 }
 
@@ -762,6 +781,7 @@ func (n *Node) Exception3() error {
 	if len(myCluster) > 0 {
 		return nil
 	}
+	n.f.WriteString(fmt.Sprintf("[%d]: No members in my cluster\nSearching for: %d\n", n.Id, n.CNN[1].Id))
 	n.sendMsg(messages.NewMessage(n.Id, n.CNN[1].Id, messages.DefaultTTL, &messages.ClusterRequestMessage{
 		SenderId: n.Id,
 	}))
@@ -799,6 +819,37 @@ listenLoop:
 }
 
 func (n *Node) Exceptions() error {
+
+	n.sendMsg(messages.NewMessage(n.Id, messages.BcastId, messages.DefaultTTL, &messages.ClusterMessage{
+		ClusterId: n.PCH[len(n.PCH)-1].Id,
+		SenderId:  n.Id,
+	}))
+
+	timer := time.NewTimer(500 * time.Millisecond)
+	defer timer.Stop()
+
+	received := make(map[*Node]struct{})
+listenLoop:
+	for len(received) < len(n.DHopNeighbors) {
+		select {
+		case msg := <-n.internalChan:
+			clusterMsg, ok := msg.(*messages.ClusterMessage)
+			if !ok {
+				continue
+			}
+
+			if _, ok := n.DHopNeighbors[clusterMsg.SenderId]; ok {
+				if _, ok := received[n.DHopNeighbors[clusterMsg.SenderId]]; !ok {
+					received[n.DHopNeighbors[clusterMsg.SenderId]] = struct{}{}
+				}
+			}
+		case <-timer.C:
+			n.f.WriteString(fmt.Sprintf("[%d]: Didnt receive from all neighbors %v\n", n.Id, received))
+			break listenLoop
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 
 	// 1st exception: Check if in my path to CH there is no other cluster
 	if err := n.Exception1(); err != nil {
