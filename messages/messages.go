@@ -11,6 +11,18 @@ const (
 	BcastId    = -1
 )
 
+const (
+	CHRequest = iota
+	CHResponse
+	CHFinal
+	GetClusterRequest
+	GetClusterResponse
+	Weights
+	BFSRequest
+	BFSResponse
+	Cluster
+)
+
 type Message struct {
 	ID   int
 	From int
@@ -69,7 +81,7 @@ type CHFinalMessage struct {
 }
 
 // SubscribeMsg is used for subscribing to a node to receive CNN messages from it.Used in relative max.
-type SubscribeMsg struct {
+type SubscribeMessage struct {
 	SenderId int
 }
 
@@ -85,12 +97,12 @@ type ClusterMessage struct {
 }
 
 // GetClusterRequest is sent to learn the CH of a node.
-type GetClusterRequest struct {
+type GetClusterRequestMessage struct {
 	SenderId int
 }
 
 // GetClusterResponse is the response to the GetClusterRequest
-type GetClusterResponse struct {
+type GetClusterResponseMessage struct {
 	SenderId  int
 	ClusterId int
 }
@@ -118,7 +130,8 @@ type BFSRequestMessage struct {
 
 // BFSResponseMessage is sent from target node back to the first node
 type BFSResponseMessage struct {
-	Level  int
-	Path   []int
-	Target int
+	Level    int
+	Path     []int
+	Target   int
+	SenderId int
 }

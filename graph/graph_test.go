@@ -19,7 +19,7 @@ func TestDistributedBFS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := g.ParseGraphFile("../snapshots/cars_15.txt", "\n\n"); err != nil {
+	if err := g.ParseGraphFile("../snapshots/cars_95.txt", "\n\n"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -31,14 +31,23 @@ func TestDistributedBFS(t *testing.T) {
 		go n.Start(ctx)
 	}
 
-	startNode, ok := g.Nodes[3]
+	startNode, ok := g.Nodes[38]
 
 	if !ok {
 		t.FailNow()
 	}
 
-	fmt.Println(node.PrintPath(startNode.FindPath(g.Nodes[5])))
-	fmt.Println(startNode.DistributedBFS(5))
+	fmt.Println(node.PrintPath(startNode.FindPath(g.Nodes[39])))
+	fmt.Printf("Nodes: %d\n", len(g.Nodes))
+	paths := make([][]int, 0)
+	for _, n := range g.Nodes {
+		path := startNode.DistributedBFS(n.Id)
+		if len(path) == 0 {
+			fmt.Println(n.Id, "not reachable")
+		}
+		paths = append(paths, path)
+	}
+	fmt.Printf("Paths: %d\n", len(paths))
 
 }
 
