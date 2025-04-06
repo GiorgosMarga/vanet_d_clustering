@@ -472,9 +472,9 @@ func (n *Node) RelativeMax(d int) {
 	minRelativeMob := math.MaxFloat64
 	for msg := range msgs {
 		cnn := n.DHopNeighbors[msg.SenderId]
-		relativeMobility := n.CNN[n.round-1].GetRelativeMobility(msg.Velocity, msg.Angle, msg.PosX, msg.PosY, cnn.Degree(), cnn.PCI())
-		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[n.round-1].Id, msg.SenderId, relativeMobility))
-		if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[1].Degree() < cnn.Degree()) {
+		relativeMobility := n.CNN[0].GetRelativeMobility(msg.Velocity, msg.Angle, msg.PosX, msg.PosY, cnn.Degree(), cnn.PCI())
+		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[0].Id, msg.SenderId, relativeMobility))
+		if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[0].Degree() < cnn.Degree()) {
 			n.CNN[1] = cnn
 			minRelativeMob = relativeMobility
 		}
