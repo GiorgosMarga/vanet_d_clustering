@@ -9,7 +9,10 @@ clean:
 	rm -rf ./sumo/*
 	rm -rf ./graphviz/*
 	rm -rf ./graph_info/*
-	rm -rf ./cars_info/snapshots/*
+	rm -rf ./cars_info/*
+	rm -rf ./graph.info
 clean/snapshots:
 	rm -rf ./snapshots/*
+clean/data:
+	rm -rf ./data/*
 .PHONY: graph

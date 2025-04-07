@@ -14,6 +14,11 @@ func NewScaler() *Scaler {
 	}
 }
 
+func (s *Scaler) FitTransform(data [][][]float64) [][][]float64 {
+	s.Fit(data)
+	return s.Transform(data)
+}
+
 func (s *Scaler) Fit(data [][][]float64) {
 	for i := range data {
 		for ii := range data[i] {

@@ -6,8 +6,7 @@ import (
 )
 
 const (
-	BcastMsg = iota
-	BeaconMsg
+	BcastId = -1
 )
 
 const DefaultTTL = 10 // rebroadcasts
@@ -34,6 +33,7 @@ type BeaconMessage struct {
 	Velocity float64
 	PosX     float64
 	PosY     float64
+	Angle    float64
 	Degree   int
 	SenderId int
 	Round    int
@@ -46,16 +46,8 @@ type CNNMessage struct {
 	Round    int
 }
 
-type CHMessage struct {
-	CH int
-}
-
 type SubscribeMsg struct {
 	SenderId int
-}
-
-type EndRoundMessage struct {
-	Round int
 }
 
 type ClusterMessage struct {
@@ -64,6 +56,7 @@ type ClusterMessage struct {
 	Sender    int
 }
 
+<<<<<<< HEAD
 func NewClusterMessage(clusterId, sender int, isCh bool) *ClusterMessage {
 	return &ClusterMessage{
 		ClusterId: clusterId,
@@ -95,4 +88,14 @@ func NewSubscribeMessage(senderId int) *SubscribeMsg {
 	return &SubscribeMsg{
 		SenderId: senderId,
 	}
+=======
+type WeightsMessage struct {
+	SenderId int
+	Weights  [][][]float64
+}
+
+type ClusterWeightsMessage struct {
+	SenderId       int
+	AverageWeights [][][]float64
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 }

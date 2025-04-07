@@ -3,13 +3,14 @@ package graph
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"vanet_d_clustering/node"
 	"vanet_d_clustering/utils"
@@ -31,13 +32,29 @@ type Graph struct {
 	d                int
 	f                *os.File
 	links            int
+	PoolOfNodes      map[int]*node.Node
 }
 
+<<<<<<< HEAD
 func NewGraph(minClusterNumber, d int, filename string) (*Graph, error) {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
+=======
+func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
+	f, err := os.OpenFile(filepath.Join(utils.GetProjectRoot(), "graph_info", "graph.info"), os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	pool := make(map[int]*node.Node)
+
+	for id := range numOfNodes {
+
+		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", id)))
+	}
+	fmt.Printf("Initialized %d nodes\n", numOfNodes)
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 	return &Graph{
 		Nodes:            make(map[int]*node.Node),
 		wg:               sync.WaitGroup{},
@@ -46,6 +63,8 @@ func NewGraph(minClusterNumber, d int, filename string) (*Graph, error) {
 		d:                d,
 		f:                f,
 		links:            0,
+		f:                f,
+		PoolOfNodes:      pool,
 	}, nil
 }
 
@@ -54,8 +73,6 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	if err != nil {
 		return err
 	}
-
-	filename := utils.GetFileName(path)
 
 	sf := string(f)
 	sf = strings.Replace(sf, "\r\n", "\n", -1)
@@ -80,11 +97,30 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 			}
 		}
 
+<<<<<<< HEAD
 		node := node.NewNode(int(t[0]), g.d, t[1], t[2], t[3], t[4], fmt.Sprintf("./cars_info/%s_%d.info", filename, int(t[0])))
 		g.AddNode(node)
+=======
+		var n *node.Node
+		nodeId := int(t[0])
+		n, ok := g.Nodes[nodeId]
+		if !ok {
+			n = g.PoolOfNodes[nodeId]
+		}
+		if n == nil {
+
+			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", nodeId)))
+			g.AddNode(n)
+			continue
+		}
+		n.UpdateNode(t[1], t[2], t[3], t[4])
+		g.AddNode(n)
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 	}
 
-	for _, connection := range strings.Split(connections, "\n") {
+	totalConnections := strings.Split(connections, "\n")
+	g.links = len(totalConnections)
+	for _, connection := range totalConnections {
 		splitted := strings.Split(strings.TrimSpace(connection), "-")
 		if len(splitted) != 2 {
 			return fmt.Errorf("failed to split connections correctly %s", connection)
@@ -102,7 +138,6 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		}
 		n1, n2 := g.Nodes[node1Id], g.Nodes[node2Id]
 		n1.AddNeighbor(n2)
-		g.links++
 	}
 	return nil
 }
@@ -169,14 +204,20 @@ func (g *Graph) GenerateSUMOFile(filename string) error {
 
 func (g *Graph) DHCV() {
 	wg := sync.WaitGroup{}
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+	beaconCTX, cancelBeacon := context.WithCancel(context.Background())
 	defer cancel()
 
 	for _, n := range g.Nodes {
+<<<<<<< HEAD
 		go n.Beacon(ctx)
 	}
 
 	for _, n := range g.Nodes {
+=======
+		go n.Beacon(beaconCTX)
+		go n.Start(ctx, g.d)
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 		wg.Add(1)
 		go func() {
 			n.Start(ctx, g.d)
@@ -188,25 +229,28 @@ func (g *Graph) DHCV() {
 		go n.RelativeMax(g.d)
 	}
 	wg.Wait()
-
 	g.formClusters()
 	// exception 1
-mainLoop:
-	for {
-		for _, n := range g.Nodes {
-			ch := n.PCH[g.d]
-			pathToCH := n.FindPath(ch)
-			// for each node in the path, if the node is a CH then join
-			// the CH might not have select itself as CH
-			for _, node := range pathToCH {
-				if node.PCH[g.d] != n.PCH[g.d] && node != ch {
-					n.PCH[g.d] = g.Nodes[node.Id]
-					g.Log(fmt.Sprintf("[%d]: Passing through %d(%d) -> new CH: %d\n", n.Id, node.Id, node.PCH[g.d].Id, g.Nodes[node.Id].Id))
-					continue mainLoop
+	for _, n := range g.Nodes {
+		ch := n.PCH[g.d]
+		if ch.Id == n.Id {
+			continue
+		}
+		pathToCH := n.FindPath(ch)
+		// for each node in the path, if the node is a CH then join
+		// the CH might not have select itself as CH
+		for _, node := range pathToCH {
+			if node.PCH[g.d] != n.PCH[g.d] {
+				newPotentialPCH := node.PCH[g.d]
+				if len(n.FindPath(newPotentialPCH)) >= g.d {
+					g.Log(fmt.Sprintf("[%d]:%d Passing through %d(%d) cant satisfy d\n", n.Id, n.PCH[g.d].Id, node.Id, node.PCH[g.d].Id))
+					n.PCH[g.d] = n.CNN[1]
+					break
 				}
+				n.PCH[g.d] = newPotentialPCH
+				break
 			}
 		}
-		break
 	}
 	g.formClusters()
 	g.Log(fmt.Sprintln(g.clusters))
@@ -244,10 +288,10 @@ exceptionLoop:
 	g.Log(fmt.Sprintln("Exception 3"))
 	// exception 3
 exception3Loop:
-	for _, cluster := range g.clusters {
+	for chId, cluster := range g.clusters {
 		if len(cluster) == 1 {
 			// CH with no CMs
-			n := g.Nodes[cluster[0]]
+			n := g.Nodes[chId]
 			for i := g.d - 1; i >= 0; i-- {
 				potentialCH := n.CNN[i].PCH[g.d]
 				if len(n.FindPath(potentialCH)) <= g.d {
@@ -280,7 +324,7 @@ mergeLoop:
 					chNode := g.Nodes[newPotentialCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
 					if len(pathTo) <= g.d && len(pathTo) > 0 {
-						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.PosX, chNode.PosY, chNode.Degree(), chNode.PCI())
+						mob := g.Nodes[ch].GetRelativeMobility(chNode.Velocity, chNode.Angle, chNode.PosX, chNode.PosY, chNode.Degree(), chNode.PCI())
 						g.Log(fmt.Sprintf("Comparing %d->%d %f\n", ch, newPotentialCh, mob))
 						if mob < bestCh {
 							bestCh = mob
@@ -298,7 +342,9 @@ mergeLoop:
 					if cm.PCH[g.d] != bestChNode {
 						g.Log(fmt.Sprintf("[%d]: passing through another cluster: %d\n", currCh.Id, cm.PCH[g.d].Id))
 						// passing through another cluster, dont merge
-						continue mergeLoop
+						bestChNode = cm.PCH[g.d]
+						// continue mergeLoop
+						break
 					}
 				}
 				for _, nodeId := range cluster {
@@ -324,8 +370,36 @@ mergeLoop:
 		}
 	}
 	g.formClusters()
+<<<<<<< HEAD
 	g.Log(fmt.Sprintln(g.clusters))
 	g.Log(fmt.Sprintln("Density:", g.CalculateDensity()))
+=======
+	g.Log(fmt.Sprintf("%v\n", g.clusters))
+
+	cancelBeacon()
+	// training
+	for _, n := range g.Nodes {
+		wg.Add(1)
+		go func() {
+			n.Train()
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	fmt.Printf("All nodes finished training\n")
+	g.Log(fmt.Sprintf("Trained %d nodes\n", len(g.Nodes)))
+
+	for _, n := range g.Nodes {
+		wg.Add(1)
+		go func() {
+			n.HandleWeightsExchange(g.clusters)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	g.Log(fmt.Sprintf("Exchanged %d nodes\n", len(g.Nodes)))
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 }
 
 func (g *Graph) CalculateDensity() float32 {

@@ -6,21 +6,34 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"sync"
 	"time"
 
+<<<<<<< HEAD
 	"vanet_d_clustering/messages"
+=======
+	"github.com/GiorgosMarga/vanet_d_clustering/gru"
+	"github.com/GiorgosMarga/vanet_d_clustering/messages"
+	"github.com/GiorgosMarga/vanet_d_clustering/utils"
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 )
 
 const (
-	a = 0.1
-	b = 0.9
-	c = 1
+	a                   = 0.1
+	b                   = 0.9
+	c                   = 1
+	TrainSizePercentage = 0.8
+	HiddenStateSize     = 16
+	InputSize           = 4
+	Epochs              = 30
+	BatchSize           = 10
 )
 
 type Node struct {
+<<<<<<< HEAD
 	Id            int
 	DHopNeighbors map[int]map[int]*Node
 	Velocity      float64
@@ -41,10 +54,32 @@ type Node struct {
 }
 
 func NewNode(id, d int, posx, posy, velocity float64, angle float64, filename string) *Node {
+=======
+	Id             int
+	DHopNeighbors  map[int]*Node
+	Velocity       float64
+	PosX           float64
+	PosY           float64
+	Angle          float64
+	CNN            []*Node
+	PCH            []*Node
+	msgChan        chan *messages.Message
+	finishChan     chan struct{}
+	internalChan   chan any
+	f              *os.File
+	round          int
+	subscribers    map[int]struct{}
+	gru            *gru.GRU
+	weightMessages map[int]*messages.WeightsMessage
+}
+
+func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *Node {
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
+<<<<<<< HEAD
 	dhop := make(map[int]map[int]*Node)
 	dhop[1] = make(map[int]*Node)
 	return &Node{
@@ -67,10 +102,193 @@ func NewNode(id, d int, posx, posy, velocity float64, angle float64, filename st
 }
 
 func PrintPath(path []*Node) {
-	for _, n := range path {
-		fmt.Printf("%d ", n.Id)
+=======
+
+	gru := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, 0.001)
+
+	if err := gru.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
+		panic(err)
 	}
-	fmt.Println()
+
+	return &Node{
+		Id:             id,
+		Velocity:       velocity,
+		PosX:           posx,
+		PosY:           posy,
+		Angle:          angle,
+		CNN:            make([]*Node, d+1),
+		PCH:            make([]*Node, d+1),
+		msgChan:        make(chan *messages.Message, 1000), //TODO: change this
+		internalChan:   make(chan any, 1000),
+		round:          1,
+		finishChan:     make(chan struct{}),
+		f:              f,
+		DHopNeighbors:  make(map[int]*Node),
+		subscribers:    make(map[int]struct{}),
+		gru:            gru,
+		weightMessages: make(map[int]*messages.WeightsMessage),
+	}
+}
+
+func (n *Node) UpdateNode(posx, posy, velocity, angle float64) {
+	n.PosX = posx
+	n.PosY = posy
+	n.Velocity = velocity
+	n.Angle = angle
+}
+
+func (n *Node) ResetNode() {
+	n.round = 1
+	n.PCH = make([]*Node, len(n.PCH))
+	n.CNN = make([]*Node, len(n.CNN))
+	n.DHopNeighbors = make(map[int]*Node)
+	n.subscribers = make(map[int]struct{})
+}
+
+func (n *Node) SendWeights() {
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: n.gru.GetWeights()}))
+}
+func PrintPath(path []*Node) string {
+	s := ""
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
+	for _, n := range path {
+		s += fmt.Sprintf("%d ", n.Id)
+	}
+	s += "\n"
+	return s
+}
+
+func (n *Node) Predict() error {
+	n.f.WriteString(fmt.Sprintf("Predicting node %d\n", n.Id))
+
+	predictSize := int(float64(len(n.gru.X)) * TrainSizePercentage)
+	n.gru.X = n.gru.X[predictSize:]
+	n.gru.Y = n.gru.Y[predictSize:]
+
+	for i := range len(n.gru.X) {
+		output, err := n.gru.Predict(n.gru.X[i])
+		if err != nil {
+			return err
+		}
+		n.f.WriteString(fmt.Sprintf("[%d]: Predicted: %f, Expected: %f\n", n.Id, n.gru.Sx.InverseTransform([][][]float64{output})[0][0], n.gru.Sx.InverseTransform([][][]float64{n.gru.Y[i]})[0][0]))
+	}
+	return nil
+}
+func (n *Node) Train() error {
+
+	trainSize := int(float64(len(n.gru.X)) * TrainSizePercentage)
+
+	n.f.WriteString(fmt.Sprintf("Training node %d\n", n.Id))
+	if err := n.gru.Train(n.gru.X[:trainSize], n.gru.Y[:trainSize], Epochs, BatchSize); err != nil {
+		return err
+	}
+	n.f.WriteString(fmt.Sprintf("Finished training node %d\n", n.Id))
+	// print errors
+	n.f.WriteString(fmt.Sprintf("Errors: %+v\n", n.gru.Errors))
+	return nil
+}
+
+// TODO: change cluster size and fix function (no if/else) split ?
+func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
+	myCluster := clusters[n.PCH[len(n.PCH)-1].Id]
+	clusterSize := len(myCluster)
+	if n.IsCH() {
+		n.f.WriteString(fmt.Sprintf("[%d]: Expecting %d weights\n", n.Id, clusterSize-1))
+		weights := make([][][][]float64, 1, clusterSize)
+		weights[0] = n.gru.GetWeights()
+		timer := time.NewTimer(100 * time.Millisecond)
+		defer timer.Stop()
+	membersLoop:
+		for len(weights) < clusterSize {
+			select {
+			case msg := <-n.internalChan:
+				weightMessage, ok := msg.(*messages.WeightsMessage)
+				if !ok {
+					continue
+				}
+				weights = append(weights, weightMessage.Weights)
+			case <-timer.C:
+				n.f.WriteString(fmt.Sprintf("[%d]: Received only %d weights\n", n.Id, len(weights)))
+				break membersLoop
+			}
+
+		}
+		averageWeights := gru.CalculateAverageWeights(weights)
+
+		// send average weights to all cluster heads
+		for clusterId := range clusters {
+			// don't send to itself
+			if clusterId == n.PCH[len(n.PCH)-1].Id {
+				continue
+			}
+			n.sendMsg(messages.NewMessage(n.Id, clusterId, messages.DefaultTTL, &messages.ClusterWeightsMessage{
+				SenderId:       n.Id,
+				AverageWeights: averageWeights,
+			}))
+		}
+
+		// receive average weights from other cluster heads
+		averageWeightsFromClusters := make([][][][]float64, 1, len(clusters))
+		averageWeightsFromClusters[0] = averageWeights
+
+		// since there is no path to all cluster heads, if cluster doesnt receive
+		// a message from a cluster head, in 100ms, it stops waiting
+		// and calculates the average weights
+	clustersLoop:
+		for range len(clusters) {
+			timer := time.NewTimer(100 * time.Millisecond)
+			select {
+			case msg := <-n.internalChan:
+				weightMessage, ok := msg.(*messages.ClusterWeightsMessage)
+				if !ok {
+					continue
+				}
+				averageWeightsFromClusters = append(averageWeightsFromClusters, weightMessage.AverageWeights)
+				if !timer.Stop() {
+					<-timer.C
+				}
+			case <-timer.C:
+				continue clustersLoop
+			}
+		}
+		totalAverage := gru.CalculateAverageWeights(averageWeightsFromClusters)
+
+		for _, nodeId := range myCluster {
+			if nodeId != n.Id {
+				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: totalAverage}))
+			}
+		}
+		if err := n.gru.SetWeights(totalAverage); err != nil {
+			panic(err)
+		}
+		n.f.WriteString(fmt.Sprintf("[%d]: Finished exchanging weights\n", n.Id))
+		return
+	}
+	// this is executed only by the cluster members
+	n.SendWeights()
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
+outerLoop:
+	for {
+		select {
+		case msg := <-n.internalChan:
+			weightsMessage, ok := msg.(*messages.WeightsMessage)
+			if !ok {
+				continue
+			}
+			if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
+				panic(err)
+			}
+			n.f.WriteString(fmt.Sprintf("CH: %d, Weights: %v\n", n.Id, weightsMessage.Weights))
+			break outerLoop
+		case <-timer.C:
+			fmt.Printf("[%d]: Did not receive weights\n", n.Id)
+			n.printPCH(len(n.PCH))
+			break outerLoop
+
+		}
+
+	}
 }
 
 func (n *Node) writePCH(d int) string {
@@ -90,9 +308,10 @@ func (n *Node) writeCNN(d int) string {
 	return s
 }
 func (n *Node) printPCH(d int) {
+	fmt.Printf("[%d]: PCH: %d\n", n.Id, len(n.PCH))
 	fmt.Printf("[%d]: ", n.Id)
 	for i := range d {
-		fmt.Printf("%d(%d) ", n.PCH[i].Id, n.PCH[i].PCH[d].Id)
+		fmt.Printf("%d ", n.PCH[i].Id)
 	}
 	fmt.Println()
 }
@@ -108,8 +327,16 @@ func (n *Node) AddNeighbor(neighbor *Node) {
 func (n *Node) Degree() int {
 	return len(n.DHopNeighbors[1])
 }
+<<<<<<< HEAD
 func (n *Node) isCH(d int) bool {
 	return n.PCH[d].Id == n.Id
+=======
+func (n *Node) IsCH() bool {
+	if n.PCH[len(n.PCH)-1] == nil {
+		panic(fmt.Sprintf("[%d]: %+v\n", n.Id, n.PCH))
+	}
+	return n.PCH[len(n.PCH)-1].Id == n.Id
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 }
 
 func (n *Node) GetdHopNeighs(d int) map[int]*Node {
@@ -140,26 +367,38 @@ func (n *Node) bcast(msg *messages.Message) {
 	m := *msg
 	m.Ttl--
 
+<<<<<<< HEAD
 	for _, cn := range n.DHopNeighbors[1] {
+=======
+	for _, cn := range n.DHopNeighbors {
+		if m.From == cn.Id {
+			continue
+		}
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 		timer := time.NewTimer(500 * time.Millisecond)
 		select {
 		case cn.msgChan <- &m:
-			continue
+			if !timer.Stop() {
+				<-timer.C
+			}
 		case <-timer.C:
 			n.f.WriteString(fmt.Sprintf("Failed to send message (bcast) to: (%d)\n", cn.Id))
-			timer.Stop()
 		}
 	}
 }
 func (n *Node) sendMsg(msg *messages.Message) {
+<<<<<<< HEAD
 	if c, ok := n.DHopNeighbors[1][msg.To]; ok {
 		timer := time.NewTimer(500 * time.Millisecond)
+=======
+	timer := time.NewTimer(500 * time.Millisecond)
+	defer timer.Stop()
+	if c, ok := n.DHopNeighbors[msg.To]; ok {
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 		select {
 		case c.msgChan <- msg:
-			break
 		case <-timer.C:
 			n.f.WriteString(fmt.Sprintf("[%d]: Failed to send message to: (%d)\n", n.Id, msg.To))
-			timer.Stop()
 		}
 		return
 	}
@@ -172,6 +411,7 @@ func (n *Node) sendBeacons() {
 			Velocity: n.Velocity,
 			PosX:     n.PosX,
 			PosY:     n.PosY,
+			Angle:    n.Angle,
 			SenderId: n.Id,
 			Round:    1,
 		})
@@ -203,7 +443,11 @@ func (n *Node) advertiseCluster() {
 		msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.ClusterMessage{
 			Sender:    n.Id,
 			ClusterId: n.PCH[d].Id,
+<<<<<<< HEAD
 			IsCh:      n.isCH(d),
+=======
+			IsCh:      n.IsCH(),
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 		})
 		n.sendMsg(msg)
 	}
@@ -262,6 +506,11 @@ func (n *Node) Start(ctx context.Context, d int) {
 				senderId := m.Msg.(*messages.SubscribeMsg).SenderId
 				n.subscribers[senderId] = struct{}{}
 				continue
+<<<<<<< HEAD
+=======
+			case *messages.WeightsMessage:
+			case *messages.ClusterWeightsMessage:
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 			}
 			n.internalChan <- m.Msg
 		case <-ctx.Done():
@@ -273,6 +522,7 @@ func (n *Node) Start(ctx context.Context, d int) {
 	}
 }
 
+<<<<<<< HEAD
 // exceptions are not used for now.
 func (n *Node) Exceptions(d int) {
 	var (
@@ -303,6 +553,8 @@ func (n *Node) Exceptions(d int) {
 	clusters[n.PCH[d].Id] = append(clusters[n.PCH[d].Id], n.Id)
 
 }
+=======
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 func (n *Node) RelativeMax(d int) {
 	n.CNN[0] = n
 	n.PCH[0] = n
@@ -313,8 +565,7 @@ func (n *Node) RelativeMax(d int) {
 			n.CNN[i] = n
 			n.PCH[i] = n
 		}
-
-		return
+		panic("No neighbors")
 	}
 
 	// In the first round, each node finds the CNN based on it's neighborhood.
@@ -336,11 +587,18 @@ func (n *Node) RelativeMax(d int) {
 
 	minRelativeMob := math.MaxFloat64
 	for msg := range msgs {
+<<<<<<< HEAD
 		cnn := n.DHopNeighbors[1][msg.SenderId]
 		relativeMobility := n.CNN[n.round-1].GetRelativeMobility(msg.Velocity, msg.PosX, msg.PosY, cnn.Degree(), cnn.PCI())
 		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[n.round-1].Id, msg.SenderId, relativeMobility))
 		// fmt.Printf("[%d]: Comparing CNN: %d with %d (%f)\n", n.Id, n.CNN[n.round-1].Id, msg.SenderId, relativeMobility)
 		if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[1].Degree() < cnn.Degree()) {
+=======
+		cnn := n.DHopNeighbors[msg.SenderId]
+		relativeMobility := n.CNN[0].GetRelativeMobility(msg.Velocity, msg.Angle, msg.PosX, msg.PosY, cnn.Degree(), cnn.PCI())
+		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[0].Id, msg.SenderId, relativeMobility))
+		if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[0].Degree() < cnn.Degree()) {
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 			n.CNN[1] = cnn
 			minRelativeMob = relativeMobility
 		}
@@ -349,13 +607,20 @@ func (n *Node) RelativeMax(d int) {
 		n.PCH[1] = n.CNN[1]
 	} else {
 		n.PCH[1] = n.PCH[0]
+
+		for n.round = 2; n.round <= d; n.round++ {
+			n.PCH[n.round] = n
+			n.CNN[n.round] = n
+			n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
+		}
+		return
 	}
 
 	n.f.WriteString(fmt.Sprintf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id))
 	// fmt.Printf("[%d]: Round 1: CNN: %d, PCH: %d\n", n.Id, n.CNN[1].Id, n.PCH[1].Id)
 
 	// Each node has to subscribe to its potential pch to be able to receive CNN messages
-	subMsg := messages.NewMessage(n.Id, n.PCH[1].Id, messages.DefaultTTL, messages.NewSubscribeMessage(n.Id))
+	subMsg := messages.NewMessage(n.Id, n.PCH[1].Id, messages.DefaultTTL, &messages.SubscribeMsg{SenderId: n.Id})
 	n.sendMsg(subMsg)
 
 	// for the rest of the rounds the CNN is selected based on what the previous CNN has selected
@@ -363,11 +628,15 @@ func (n *Node) RelativeMax(d int) {
 		n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 		newMsg := <-n.internalChan
 		cnnMessage, ok := newMsg.(*messages.CNNMessage)
+<<<<<<< HEAD
 		if !ok {
 			// fmt.Printf("[%d]: Received invalid type message: %+v, expected: CNNMessage\n", n.Id, newMsg)
 			continue
 		}
 		if cnnMessage.Round != n.round {
+=======
+		if !ok || cnnMessage.Round != n.round || cnnMessage.SenderId != n.PCH[n.round-1].Id {
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 			continue
 		}
 		// fmt.Printf("[%d]: Received CNN message from: (%d) -> %+v\n", n.Id, cnnMessage.SenderId, cnnMessage)
@@ -382,20 +651,26 @@ func (n *Node) RelativeMax(d int) {
 		} else {
 			n.PCH[n.round] = n.PCH[n.round-1]
 		}
+<<<<<<< HEAD
 		n.f.WriteString(fmt.Sprintf("CNN: %d\tPCH: %d\n", n.CNN[n.round].Id, n.PCH[n.round].Id))
 		// fmt.Printf("[%d]: CNN: %d\tPCH: %d\n", n.Id, n.CNN[n.round].Id, n.PCH[n.round].Id)
+=======
+		n.f.WriteString(fmt.Sprintf("[%d]: Round %d: CNN: %d, PCH: %d\n", n.Id, n.round, n.CNN[n.round].Id, n.PCH[n.round].Id))
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 		n.round++
 	}
-	n.f.WriteString(fmt.Sprintf("CNN: %s\nPCH: %s\n", n.writeCNN(d), n.writePCH(d)))
 	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
 	// fmt.Printf("[%d]: Finished all rounds my CH: %d\n", n.Id, n.PCH[d].Id)
 }
-func (n *Node) GetRelativeMobility(vel float64, x, y float64, degree, pci int) float64 {
+func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, pci int) float64 {
 	dx := math.Pow(n.PosX-x, 2)
 	dy := math.Pow(n.PosY-y, 2)
 	dxy := math.Sqrt(dx + dy)
+
+	dvelocityX := math.Abs(math.Cos(angle)*vel - math.Cos(n.Angle)*n.Velocity)
+
 	// Using degree
-	return a*dxy + b*math.Abs(n.Velocity-vel) + c*(float64(n.Degree())-float64(degree))
+	return a*dxy + b*dvelocityX + c*(float64(n.Degree())-float64(degree))
 	// Using PCI
 	// return a*dxy + b*math.Abs(n.Velocity-vel) + c*(float64(n.PCI())-float64(n.PCI()))
 

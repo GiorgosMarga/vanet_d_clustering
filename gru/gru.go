@@ -2,8 +2,15 @@ package gru
 
 import (
 	"fmt"
+<<<<<<< HEAD
 	"math"
 	"math/rand/v2"
+=======
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 )
 
 type LossFunction func(yActual [][]float64, yPred [][]float64) float64
@@ -175,6 +182,7 @@ func sumRows(matrix [][]float64) [][]float64 {
 }
 
 type GRU struct {
+
 	// update gate
 	UpdateGate *Gate
 	// reset gate
@@ -211,9 +219,23 @@ type GRU struct {
 	wOut   [][]float64
 	bOut   [][]float64
 	output [][]float64
+
+	// early stopping patience
+	earlyStop *EarlyStop
+
+	// input and target
+	X [][][]float64
+	Y [][][]float64
+
+	// save errors in case of plotting
+	Errors []float64
+
+	// scalers
+	Sx *Scaler
+	Sy *Scaler
 }
 
-func NewGRU(hiddenSize, inputSize int, lossFunction LossFunction, learningRate float64) *GRU {
+func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, learningRate float64) *GRU {
 	scale := 1.0 / float64(hiddenSize) // Xavier-like scaling
 	updateGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	resetGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
@@ -232,6 +254,10 @@ func NewGRU(hiddenSize, inputSize int, lossFunction LossFunction, learningRate f
 		wOut:         randomMatrix(1, hiddenSize, scale),
 		bOut:         randomMatrix(1, 1, scale),
 		learningRate: learningRate,
+		earlyStop:    NewEarlyStop(patience, 0.001),
+		Errors:       make([]float64, 0),
+		Sx:           NewScaler(),
+		Sy:           NewScaler(),
 	}
 }
 
@@ -248,6 +274,12 @@ func (g *GRU) calculateCandidateHiddenState() [][]float64 {
 	}
 
 	return g.candidateH
+}
+func (g *GRU) Predict(X [][]float64) ([][]float64, error) {
+	var err error
+	g.Input = X
+	g.output, err = g.forwardPass()
+	return g.output, err
 }
 
 func (g *GRU) calculateFinalHiddenState() [][]float64 {
@@ -358,9 +390,14 @@ func (g *GRU) initializeHiddenState(hiddenSize int) {
 	}
 	g.prevH = h
 }
+<<<<<<< HEAD
 func (g *GRU) Train(inputs, targets [][][]float64, epochs int) error {
+=======
+
+func (g *GRU) Train(inputs, targets [][][]float64, epochs, batchSize int) error {
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 	g.initializeHiddenState(g.hiddenSize)
-	for epoch := range epochs {
+	for range epochs {
 		var totalLoss float64 = 0
 
 		for t := range inputs {
@@ -379,9 +416,19 @@ func (g *GRU) Train(inputs, targets [][][]float64, epochs int) error {
 			g.updateWeights()
 			g.prevH = g.finalH
 		}
+<<<<<<< HEAD
 		// Print average loss for the epoch
 		averageLoss := totalLoss / float64(len(inputs))
 		fmt.Printf("Epoch: %d, Loss: %.4f\n", epoch, averageLoss)
+=======
+		averageLoss := totalLoss / float64(len(inputs)/batchSize)
+		if g.earlyStop.CheckEarlyStop(averageLoss) {
+			// fmt.Printf("Early stopping at epoch %d\n", epoch)
+			break
+		}
+		// fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, averageLoss)
+		g.Errors = append(g.Errors, averageLoss)
+>>>>>>> 7b551a218ba6306d7e17e8d3ba926a84ef878404
 	}
 
 	return nil
@@ -432,4 +479,103 @@ func standardizeData(X [][][]float64) [][][]float64 {
 	}
 
 	return standardized
+}
+
+func (g *GRU) GetWeights() [][][]float64 {
+	weights := make([][][]float64, 9)
+
+	weights[0] = g.Whx
+	weights[1] = g.Whh
+	weights[2] = g.bh
+	weights[3] = g.UpdateGate.dWH
+	weights[4] = g.UpdateGate.dWX
+	weights[5] = g.UpdateGate.bias
+	weights[6] = g.ResetGate.dWX
+	weights[7] = g.ResetGate.dWH
+	weights[8] = g.ResetGate.bias
+	return weights
+}
+
+func (g *GRU) SetWeights(weights [][][]float64) error {
+	if len(weights) != 9 {
+		return fmt.Errorf("weights length: %d, expected: 9", len(weights))
+	}
+
+	g.Whx = weights[0]
+	g.Whh = weights[1]
+	g.bh = weights[2]
+	g.UpdateGate.dWH = weights[3]
+	g.UpdateGate.dWX = weights[4]
+	g.UpdateGate.bias = weights[5]
+	g.ResetGate.dWX = weights[6]
+	g.ResetGate.dWH = weights[7]
+	g.ResetGate.bias = weights[8]
+	return nil
+}
+func R2Score(yActual, yPred [][]float64) float64 {
+	if len(yActual) != len(yPred) {
+		panic("yActual and yPred must have the same length")
+	}
+
+	var sumActual float64 = 0
+	n := len(yActual)
+	for i := range n {
+		sumActual += yActual[i][0]
+	}
+	meanActual := sumActual / float64(n)
+
+	var rss, tss float64 = 0, 0
+	for i := range n {
+		diff := yActual[i][0] - yPred[i][0]
+		rss += diff * diff
+		tss += (yActual[i][0] - meanActual) * (yActual[i][0] - meanActual)
+	}
+
+	// If TSS is zero (constant actual values), return R² = 1
+	if tss == 0 {
+		return 1
+	}
+
+	r2 := 1 - (rss / tss)
+	return r2
+}
+
+func (g *GRU) ParseFile(filename string) error {
+	f, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(f[:len(f)-1]), "\n")
+	var X [][][]float64
+	var Y [][][]float64
+	for line := range len(lines) {
+		if line+5 > len(lines) {
+			break
+		}
+		t := make([][]float64, 4)
+		for i := range 4 {
+			n, err := strconv.ParseFloat(lines[line+i], 64)
+			if err != nil {
+				panic(err)
+			}
+			t[i] = []float64{n}
+		}
+		X = append(X, t)
+		n, err := strconv.ParseFloat(lines[line+4], 64)
+		if err != nil {
+			panic(err)
+		}
+		t2 := make([][]float64, 1)
+		t2[0] = []float64{n}
+		Y = append(Y, t2)
+	}
+
+	shuffleData(X, Y)
+
+	g.X = g.Sx.FitTransform(X)
+	g.Y = g.Sy.FitTransform(Y)
+
+	return nil
+
 }
