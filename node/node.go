@@ -23,7 +23,7 @@ const (
 	TrainSizePercentage = 0.8
 	HiddenStateSize     = 16
 	InputSize           = 4
-	Epochs              = 5
+	Epochs              = 30
 	BatchSize           = 10
 )
 
@@ -107,12 +107,18 @@ func PrintPath(path []*Node) string {
 
 func (n *Node) Predict() error {
 	n.f.WriteString(fmt.Sprintf("Predicting node %d\n", n.Id))
-	output, err := n.gru.Predict(n.gru.X[0])
-	if err != nil {
-		return err
+
+	predictSize := int(float64(len(n.gru.X)) * TrainSizePercentage)
+	n.gru.X = n.gru.X[predictSize:]
+	n.gru.Y = n.gru.Y[predictSize:]
+
+	for i := range len(n.gru.X) {
+		output, err := n.gru.Predict(n.gru.X[i])
+		if err != nil {
+			return err
+		}
+		n.f.WriteString(fmt.Sprintf("[%d]: Predicted: %f, Expected: %f\n", n.Id, n.gru.Sx.InverseTransform([][][]float64{output})[0][0], n.gru.Sx.InverseTransform([][][]float64{n.gru.Y[i]})[0][0]))
 	}
-	fmt.Printf("[%d]: Predicted: %f, Expected: %f\n", n.Id, n.gru.Sx.InverseTransform([][][]float64{output})[0][0], n.gru.Sx.InverseTransform([][][]float64{n.gru.Y[0]})[0][0])
-	n.f.WriteString(fmt.Sprintf("Finished predicting node %d\n", n.Id))
 	return nil
 }
 func (n *Node) Train() error {

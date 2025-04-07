@@ -68,7 +68,8 @@ func main() {
 	}
 
 	for _, node := range g.Nodes {
-		node.Predict()
-		break
+		if node.IsCH() {
+			node.Predict()
+		}
 	}
 }
