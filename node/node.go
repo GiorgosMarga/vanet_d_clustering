@@ -25,6 +25,7 @@ const (
 	InputSize           = 4
 	Epochs              = 30
 	BatchSize           = 10
+	d                   = 2
 )
 
 type Node struct {
@@ -365,7 +366,6 @@ func (n *Node) advertiseCNN() {
 }
 
 func (n *Node) advertiseCluster() {
-	d := len(n.PCH) - 1
 	if n.PCH[d] == nil {
 		return
 	}
