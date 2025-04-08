@@ -85,10 +85,6 @@ type SubscribeMessage struct {
 	SenderId int
 }
 
-type EndRoundMessage struct {
-	Round int
-}
-
 // ClusterMessage is used for sending the cluster id of a node.
 // It is bcasted periodically from each node
 type ClusterMessage struct {
