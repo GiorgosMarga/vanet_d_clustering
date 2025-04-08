@@ -118,7 +118,7 @@ func (n *Node) Predict() error {
 		if err != nil {
 			return err
 		}
-		n.f.WriteString(fmt.Sprintf("[%d]: Predicted: %f, Expected: %f\n", n.Id, n.gru.Sx.InverseTransform([][][]float64{output})[0][0], n.gru.Sx.InverseTransform([][][]float64{n.gru.Y[i]})[0][0]))
+		n.f.WriteString(fmt.Sprintf("[%d]: Predicted: %f, Expected: %f\n", n.Id, n.gru.Sx.InverseTransform([][][]float64{output})[0][0], n.gru.Sy.InverseTransform([][][]float64{n.gru.Y[i]})[0][0]))
 	}
 	return nil
 }
@@ -131,7 +131,7 @@ func (n *Node) Train() error {
 		return err
 	}
 	n.f.WriteString(fmt.Sprintf("Finished training node %d\n", n.Id))
-	// print errors
+	// print train errors
 	n.f.WriteString(fmt.Sprintf("Errors: %+v\n", n.gru.Errors))
 	return nil
 }
@@ -182,6 +182,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		// since there is no path to all cluster heads, if cluster doesnt receive
 		// a message from a cluster head, in 100ms, it stops waiting
 		// and calculates the average weights
+
 	clustersLoop:
 		for range len(clusters) {
 			timer := time.NewTimer(100 * time.Millisecond)
@@ -200,7 +201,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 			}
 		}
 		totalAverage := gru.CalculateAverageWeights(averageWeightsFromClusters)
-
+		n.f.WriteString(fmt.Sprintf("[%d]: Received %d weights\n", n.Id, len(averageWeightsFromClusters)-1))
 		for _, nodeId := range myCluster {
 			if nodeId != n.Id {
 				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: totalAverage}))
@@ -227,7 +228,7 @@ outerLoop:
 			if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
 				panic(err)
 			}
-			n.f.WriteString(fmt.Sprintf("CH: %d, Weights: %v\n", n.Id, weightsMessage.Weights))
+			n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.Id, weightsMessage.SenderId))
 			break outerLoop
 		case <-timer.C:
 			fmt.Printf("[%d]: Did not receive weights\n", n.Id)
