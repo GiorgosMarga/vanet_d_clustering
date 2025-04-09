@@ -23,7 +23,7 @@ const (
 	TrainSizePercentage = 0.8
 	HiddenStateSize     = 16
 	InputSize           = 4
-	Epochs              = 30
+	Epochs              = 5
 	BatchSize           = 10
 	d                   = 2
 )
@@ -95,7 +95,7 @@ func (n *Node) ResetNode() {
 }
 
 func (n *Node) SendWeights() {
-	n.sendMsg(messages.NewMessage(n.Id, n.PCH[len(n.PCH)-1].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: n.gru.GetWeights()}))
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[d].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: n.gru.GetWeights()}))
 }
 func PrintPath(path []*Node) string {
 	s := ""
@@ -138,13 +138,13 @@ func (n *Node) Train() error {
 
 // TODO: change cluster size and fix function (no if/else) split ?
 func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
-	myCluster := clusters[n.PCH[len(n.PCH)-1].Id]
+	myCluster := clusters[n.PCH[d].Id]
 	clusterSize := len(myCluster)
 	if n.IsCH() {
 		n.f.WriteString(fmt.Sprintf("[%d]: Expecting %d weights\n", n.Id, clusterSize-1))
 		weights := make([][][][]float64, 1, clusterSize)
 		weights[0] = n.gru.GetWeights()
-		timer := time.NewTimer(100 * time.Millisecond)
+		timer := time.NewTimer(300 * time.Millisecond)
 		defer timer.Stop()
 	membersLoop:
 		for len(weights) < clusterSize {
@@ -166,7 +166,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		// send average weights to all cluster heads
 		for clusterId := range clusters {
 			// don't send to itself
-			if clusterId == n.PCH[len(n.PCH)-1].Id {
+			if clusterId == n.PCH[d].Id {
 				continue
 			}
 			n.sendMsg(messages.NewMessage(n.Id, clusterId, messages.DefaultTTL, &messages.ClusterWeightsMessage{
@@ -185,7 +185,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
 	clustersLoop:
 		for range len(clusters) {
-			timer := time.NewTimer(100 * time.Millisecond)
+			timer := time.NewTimer(500 * time.Millisecond)
 			select {
 			case msg := <-n.internalChan:
 				weightMessage, ok := msg.(*messages.ClusterWeightsMessage)
@@ -274,10 +274,10 @@ func (n *Node) Degree() int {
 	return len(n.DHopNeighbors)
 }
 func (n *Node) IsCH() bool {
-	if n.PCH[len(n.PCH)-1] == nil {
+	if n.PCH[d] == nil {
 		panic(fmt.Sprintf("[%d]: %+v\n", n.Id, n.PCH))
 	}
-	return n.PCH[len(n.PCH)-1].Id == n.Id
+	return n.PCH[d].Id == n.Id
 }
 
 func (n *Node) GetdHopNeighs(d int) map[int]*Node {
