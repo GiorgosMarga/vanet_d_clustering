@@ -72,9 +72,11 @@ type GRU struct {
 	// scalers
 	Sx *Scaler
 	Sy *Scaler
+
+	trainingSize float64
 }
 
-func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, learningRate float64) *GRU {
+func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, learningRate, trainingSize float64) *GRU {
 	scale := 1.0 / float64(hiddenSize) // Xavier-like scaling
 	updateGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	resetGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
@@ -97,6 +99,7 @@ func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, lear
 		Errors:       make([]float64, 0),
 		Sx:           NewScaler(),
 		Sy:           NewScaler(),
+		trainingSize: trainingSize,
 	}
 }
 
@@ -243,7 +246,10 @@ func (g *GRU) initializeHiddenState(hiddenSize int) {
 	g.prevH = h
 }
 
-func (g *GRU) Train(inputs, targets [][][]float64, epochs, batchSize int) error {
+func (g *GRU) Train(epochs, batchSize int) error {
+	trainSize := int(float64(len(g.X)) * g.trainingSize)
+	inputs := g.X[:trainSize]
+	targets := g.Y[:trainSize]
 	g.initializeHiddenState(g.hiddenSize)
 	for range epochs {
 		var totalLoss float64 = 0
@@ -404,6 +410,26 @@ func (g *GRU) ParseFile(filename string) error {
 	g.X = g.Sx.FitTransform(X)
 	g.Y = g.Sy.FitTransform(Y)
 
+	return nil
+
+}
+
+func (g *GRU) Evaluate() error {
+	dataSize := int(float64(len(g.X)) * g.trainingSize)
+	X := g.X[dataSize:]
+	Y := g.Y[dataSize:]
+
+	predictions := make([]float64, 0, len(X))
+	expected := make([]float64, 0, len(Y))
+
+	for i := range len(X) {
+		output, err := g.Predict(X[i])
+		if err != nil {
+			return err
+		}
+		predictions = append(predictions, g.Sx.InverseTransform([][][]float64{output})[0][0][0])
+		expected = append(expected, g.Sy.InverseTransform([][][]float64{Y[i]})[0][0][0])
+	}
 	return nil
 
 }

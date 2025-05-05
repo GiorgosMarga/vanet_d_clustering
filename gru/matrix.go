@@ -2,6 +2,8 @@ package gru
 
 import (
 	"fmt"
+	"math"
+	"math/cmplx"
 	"math/rand/v2"
 )
 
@@ -220,4 +222,38 @@ func CalculateAverageWeights(matrices [][][][]float64) [][][]float64 {
 		average[weightType] = matrixAverage(weightsToProcess)
 	}
 	return average
+}
+
+func FFT(x []float64) []complex128 {
+	N := len(x)
+	res := make([]complex128, N)
+	for i := range len(res) {
+		res[i] = complex(x[i], 0)
+	}
+	fftRec(res, N)
+	return res
+}
+
+func fftRec(x []complex128, N int) {
+	if N <= 1 {
+		return
+	}
+
+	odd := make([]complex128, N/2)
+	even := make([]complex128, N/2)
+
+	for i := range N / 2 {
+		even[i] = x[i*2]
+		odd[i] = x[i*2+1]
+	}
+
+	fftRec(odd, N/2)
+	fftRec(even, N/2)
+
+	for k := range N / 2 {
+
+		t := cmplx.Exp(complex(0, -2.0*math.Pi*float64(k)/float64(N))) * odd[k]
+		x[k] = even[k] + t
+		x[N/2+k] = even[k] - t
+	}
 }
