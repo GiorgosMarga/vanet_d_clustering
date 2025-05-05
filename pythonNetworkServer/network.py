@@ -16,7 +16,6 @@ class GRU():
     scaler_x = MinMaxScaler()
     scaler_y = MinMaxScaler()
     def __init__(self,X,Y):
-        print(X)
         X = np.asarray(X)
         self.input_shape = X[0].shape
         Y = np.asarray(Y)
@@ -65,8 +64,8 @@ class GRU():
 
     def predict(self, X):
         X = np.array(X)
-        X_shape = X.shape
-        X = self.scaler_x.transform(X.reshape(-1, 1)).reshape(1,X_shape[0],X_shape[1])
+        n, m, k = X.shape
+        X = self.scaler_x.transform(X.reshape(-1, 1)).reshape(n,k,m)
         output = self.model.predict(X)
         print(self.scaler_y.inverse_transform(output))
         return self.scaler_y.inverse_transform(output)

@@ -82,11 +82,16 @@ func (pn *PythonNeural) SetWeights(weights [][][]float64) error {
 	return json.NewEncoder(pn.conn).Encode(newMsg)
 }
 func (pn *PythonNeural) Predict(X [][]float64) ([][]float64, error) {
+
+	tx := make([][][]float64,100)
+	for i := range 100{
+		tx[i] = [][]float64{{float64(i+1000),float64(i+1001),float64(i+1002),float64(i+1003)}}
+	}
 	// send predict message
 	newMsg := ServerMessage{
 		Type: Predict,
 		Msg: map[string]any{
-			"x": X,
+			"x": tx,
 		},
 	}
 	err := json.NewEncoder(pn.conn).Encode(newMsg)
