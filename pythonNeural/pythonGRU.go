@@ -1,8 +1,8 @@
 package pythonneural
 
 import (
-	"bytes"
 	"encoding/json"
+	"fmt"
 	"net"
 )
 
@@ -34,11 +34,30 @@ func NewPythonNeural(address string) (*PythonNeural, error) {
 		return nil, err
 	}
 
+	X := make([][][]float64,500)
+	Y := make([][][]float64,500)
+
+	tx := make([][]float64,4)
+	for i := range 500 {
+		tx[0] = []float64{float64(i)}
+		tx[1] = []float64{float64(i+1)}
+		tx[2] = []float64{float64(i+2)}
+		tx[3] = []float64{float64(i+3)}
+		X[i] = tx
+		Y[i] = [][]float64{{float64(i+4)}}
+	}
+
+
+	for _, x := range X{
+		if len(x) != 4 {
+			fmt.Println("here",x)
+		}
+	}
 	dataMsg := ServerMessage{
 		Type: SendData,
 		Msg: map[string]any{
-			"X": [][][]float64{{{1.0}, {2.0}, {3.0}, {4.0}}, {{5.0}, {6.0}, {7.0}, {8.0}}},
-			"Y": [][][]float64{{{5.0}}, {{6.0}}},
+			"X": X,
+			"Y": Y,
 		},
 	}
 
@@ -70,12 +89,8 @@ func (pn *PythonNeural) Predict(X [][]float64) ([][]float64, error) {
 			"x": X,
 		},
 	}
-	b := new(bytes.Buffer)
-	err := json.NewEncoder(b).Encode(newMsg)
-	if err != nil {
-		return nil, err
-	}
-	_, err = pn.conn.Write(b.Bytes())
+	err := json.NewEncoder(pn.conn).Encode(newMsg)
+	//TODO: CHANGE THIS
 	return nil, err
 }
 func (pn *PythonNeural) Train(epochs, batchSize int) error {
@@ -87,13 +102,19 @@ func (pn *PythonNeural) Train(epochs, batchSize int) error {
 			"batchSize": batchSize,
 		},
 	}
-	b := new(bytes.Buffer)
-	err := json.NewEncoder(b).Encode(newMsg)
+	err := json.NewEncoder(pn.conn).Encode(newMsg)
 	if err != nil {
 		return err
 	}
-	_, err = pn.conn.Write(b.Bytes())
-	return err
+
+	b := make([]byte, 1024)
+	_, err = pn.conn.Read(b)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Finished Training")
+	return nil
 }
 
 func (pn *PythonNeural) GetWeights() [][][]float64 {
@@ -116,11 +137,7 @@ func (pn *PythonNeural) Evaluate() error {
 	newMsg := ServerMessage{
 		Type: Evaluate,
 	}
-	b := new(bytes.Buffer)
-	err := json.NewEncoder(b).Encode(newMsg)
-	if err != nil {
-		return err
-	}
-	_, err = pn.conn.Write(b.Bytes())
+	err := json.NewEncoder(pn.conn).Encode(newMsg)
+
 	return err
 }
