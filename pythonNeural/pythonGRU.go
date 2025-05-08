@@ -3,7 +3,11 @@ package pythonneural
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -34,36 +38,7 @@ func NewPythonNeural(address string) (*PythonNeural, error) {
 		return nil, err
 	}
 
-	X := make([][][]float64,500)
-	Y := make([][][]float64,500)
-
-	tx := make([][]float64,4)
-	for i := range 500 {
-		tx[0] = []float64{float64(i)}
-		tx[1] = []float64{float64(i+1)}
-		tx[2] = []float64{float64(i+2)}
-		tx[3] = []float64{float64(i+3)}
-		X[i] = tx
-		Y[i] = [][]float64{{float64(i+4)}}
-	}
-
-
-	for _, x := range X{
-		if len(x) != 4 {
-			fmt.Println("here",x)
-		}
-	}
-	dataMsg := ServerMessage{
-		Type: SendData,
-		Msg: map[string]any{
-			"X": X,
-			"Y": Y,
-		},
-	}
-
-	if err := json.NewEncoder(conn).Encode(dataMsg); err != nil {
-		return nil, err
-	}
+	//
 
 	return &PythonNeural{
 		conn: conn,
@@ -71,6 +46,18 @@ func NewPythonNeural(address string) (*PythonNeural, error) {
 
 }
 
+func (pn *PythonNeural) SendData(X, Y [][][]float64, id int) error {
+	dataMsg := ServerMessage{
+		Type: SendData,
+		Msg: map[string]any{
+			"X":  X,
+			"Y":  Y,
+			"id": id,
+		},
+	}
+
+	return json.NewEncoder(pn.conn).Encode(dataMsg)
+}
 func (pn *PythonNeural) SetWeights(weights [][][]float64) error {
 	// send set weights message
 	newMsg := ServerMessage{
@@ -83,9 +70,9 @@ func (pn *PythonNeural) SetWeights(weights [][][]float64) error {
 }
 func (pn *PythonNeural) Predict(X [][]float64) ([][]float64, error) {
 
-	tx := make([][][]float64,100)
-	for i := range 100{
-		tx[i] = [][]float64{{float64(i+1000),float64(i+1001),float64(i+1002),float64(i+1003)}}
+	tx := make([][][]float64, 100)
+	for i := range 100 {
+		tx[i] = [][]float64{{float64(i + 1000), float64(i + 1001), float64(i + 1002), float64(i + 1003)}}
 	}
 	// send predict message
 	newMsg := ServerMessage{
@@ -145,4 +132,56 @@ func (pn *PythonNeural) Evaluate() error {
 	err := json.NewEncoder(pn.conn).Encode(newMsg)
 
 	return err
+}
+
+func (pn *PythonNeural) ParseFile(filename string) ([][][]float64, [][][]float64, error) {
+	f, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	lines := strings.Split(string(f[:len(f)-1]), "\n")
+	var X [][][]float64
+	var Y [][][]float64
+	for line := range len(lines) {
+		if line+5 > len(lines) {
+			break
+		}
+		t := make([][]float64, 4)
+		for i := range 4 {
+			n, err := strconv.ParseFloat(lines[line+i], 64)
+			if err != nil {
+				panic(err)
+			}
+			t[i] = []float64{n}
+		}
+		X = append(X, t)
+		n, err := strconv.ParseFloat(lines[line+4], 64)
+		if err != nil {
+			panic(err)
+		}
+		t2 := make([][]float64, 1)
+		t2[0] = []float64{n}
+		Y = append(Y, t2)
+	}
+
+	shuffleData(X, Y)
+
+	// g.X = g.Sx.FitTransform(X)
+	// g.Y = g.Sy.FitTransform(Y)
+
+	return X, Y, nil
+
+}
+
+func shuffleData(X, Y [][][]float64) {
+	if len(X) != len(Y) {
+		panic("X and Y must have the same number of samples")
+	}
+
+	// Shuffle in place.
+	rand.Shuffle(len(X), func(i, j int) {
+		X[i], X[j] = X[j], X[i]
+		Y[i], Y[j] = Y[j], Y[i]
+	})
 }

@@ -7,15 +7,17 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
 # Parameters
-hidden_size = 128  # GRU hidden state size
+hidden_size = 16  # GRU hidden state size
 output_size = 1   # Output dimension
 batch_size = 32   # Number of sequences in a batch
 train_size = 0.8
 
 class GRU():
-    scaler_x = MinMaxScaler()
-    scaler_y = MinMaxScaler()
-    def __init__(self,X,Y):
+    def __init__(self,X,Y, id):
+        self.scaler_x = MinMaxScaler()
+        self.scaler_y = MinMaxScaler()
+        print(f"Start {id}")
+        self.id = id
         X = np.asarray(X)
         self.input_shape = X[0].shape
         Y = np.asarray(Y)
@@ -34,13 +36,8 @@ class GRU():
         ])
         self.model.build(input_shape=(batch_size, x_shape[1], x_shape[2]))
 
-    # def save_weights(self):
-    #     self.model.save_weights('gru_weights.weights.h5')
-
-    # def load_weights(self):
-    #     self.model.load_weights('gru_weights.weights.h5')
-
     def get_weights(self):
+        print(f"{self.id}: Get Weights")
         weights = []
         for weight in self.model.get_weights():
           if len(weight.shape) == 1:
@@ -49,6 +46,8 @@ class GRU():
         return weights
 
     def set_weights(self, weights):
+        print(f"{self.id}: Set Weights")
+
         model_weights = []
         for weight in weights:
             model_weight = np.array(weight)
@@ -58,19 +57,24 @@ class GRU():
         self.model.set_weights(model_weights)
 
     def train(self,epochs=50,batch_size=10):
+        print(f"{self.id}: Train")
+
         self.model.compile(optimizer='adam', loss='mse')
 
         self.model.fit(self.x_train, self.y_train, epochs=epochs, batch_size=batch_size, verbose=0)
 
     def predict(self, X):
+        print(f"{self.id}: Predict")
+
         X = np.array(X)
         n, m, k = X.shape
         X = self.scaler_x.transform(X.reshape(-1, 1)).reshape(n,k,m)
         output = self.model.predict(X)
-        print(self.scaler_y.inverse_transform(output))
         return self.scaler_y.inverse_transform(output)
 
     def evaluate(self):
+        print(f"{self.id}: Evaluate")
+
         result = self.model.evaluate(self.x_test, self.y_test)
         return result
 

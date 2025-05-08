@@ -62,7 +62,7 @@ class GoClient():
         self.conn.sendall(message.encode('utf-8'))
 
     def _handle_set_data_message(self,msg):
-        self.model = network.GRU(msg["X"],msg["Y"])
+        self.model = network.GRU(msg["X"],msg["Y"], msg["id"])
     
     def _handle_train_message(self,msg):
         if not self.model:
@@ -95,7 +95,7 @@ class Server():
             while True:
                 conn, addr = self.server_socket.accept()
                 go_client = GoClient(conn=conn,address=addr)
-                thread = threading.Thread(target=go_client.handle_conn())
+                thread = threading.Thread(target=go_client.handle_conn)
                 thread.start()
                 print(f"[Server] Active connections: {threading.active_count() - 1}")
         except KeyboardInterrupt:
