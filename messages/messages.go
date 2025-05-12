@@ -65,3 +65,8 @@ type ClusterWeightsMessage struct {
 	SenderId       int
 	AverageWeights [][][]float64
 }
+
+type ParsevalMessage struct {
+	SenderId       int
+	ParsevalValues [][]float64
+}

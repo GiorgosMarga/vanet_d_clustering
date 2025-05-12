@@ -43,7 +43,6 @@ func TestFFT(t *testing.T) {
 	fft1 := FFT(f1)
 	fft2 := FFT(f2)
 
-	
-	
+	fmt.Println(CalculateMatDistance(Parseval(fft1), Parseval(fft2)))
 
 }

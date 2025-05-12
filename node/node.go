@@ -20,15 +20,16 @@ import (
 )
 
 const (
-	a                   = 0.1
-	b                   = 0.9
-	c                   = 1
-	TrainSizePercentage = 0.8
-	HiddenStateSize     = 64
-	InputSize           = 4
-	Epochs              = 5
-	BatchSize           = 10
-	d                   = 2
+	a                    = 0.1
+	b                    = 0.9
+	c                    = 1
+	TrainSizePercentage  = 0.8
+	HiddenStateSize      = 16
+	InputSize            = 4
+	Epochs               = 50
+	BatchSize            = 5
+	d                    = 2
+	ParsevalValuesToSend = 10
 )
 
 const (
@@ -38,6 +39,7 @@ const (
 	ClusterService
 	WeightsService
 	ClusterWeightsService
+	ParsevalService
 )
 
 type Node struct {
@@ -66,21 +68,6 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		log.Fatal(err)
 	}
 
-	// nn, err := pythonneural.NewPythonNeural(":5000")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// X, Y, err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60)))
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Printf("[%d]: Parsed File\n", id)
-
-	// if err := nn.SendData(X, Y, id); err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Printf("[%d]: Sent Data\n", id)
-
 	nn := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, 0.001, 0.7)
 
 	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
@@ -103,6 +90,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 			ClusterService:        make(chan any),
 			WeightsService:        make(chan any),
 			ClusterWeightsService: make(chan any),
+			ParsevalService:       make(chan any),
 		},
 		round:          1,
 		finishChan:     make(chan struct{}),
@@ -127,6 +115,7 @@ func (n *Node) UpdateNode(posx, posy, velocity, angle float64) {
 		ClusterService:        make(chan any),
 		WeightsService:        make(chan any),
 		ClusterWeightsService: make(chan any),
+		ParsevalService:       make(chan any),
 	}
 }
 
@@ -173,72 +162,115 @@ func (n *Node) Train() error {
 	return nil
 }
 
+func (n *Node) handleParsevalExchange(clusterSize int) {
+	timer := time.NewTimer(500 * time.Millisecond)
+	defer timer.Stop()
+	parsevalValues := make([][][]float64, 0, clusterSize)
+parsevalLoop:
+	for range clusterSize - 1 {
+		select {
+		case msg := <-n.internalChans[ParsevalService]:
+			parsevalMessage, ok := msg.(*messages.ParsevalMessage)
+			if !ok {
+				continue
+			}
+			parsevalValues = append(parsevalValues, parsevalMessage.ParsevalValues)
+		case <-timer.C:
+			n.f.WriteString(fmt.Sprintf("[%d]: Received %d/%d parseval values\n", n.Id, len(parsevalValues), clusterSize-1))
+			fmt.Printf("[%d]: Received %d/%d parseval values\n", n.Id, len(parsevalValues), clusterSize)
+			break parsevalLoop
+		}
+	}
+	// n.f.WriteString("Parseval Values received: \n")
+	// for _, parsevalValue := range parsevalValues {
+	// 	n.f.WriteString(fmt.Sprintf("%+v\n", parsevalValue))
+	// }
+}
+func (n *Node) handleMembersWeightExchange(clusterSize int) [][][]float64 {
+	weights := make([][][][]float64, 1, clusterSize)
+	weights[0] = n.gru.GetWeights()
+	timer := time.NewTimer(500 * time.Millisecond)
+	defer timer.Stop()
+
+membersLoop:
+	for range clusterSize - 1 {
+		select {
+		case msg := <-n.internalChans[WeightsService]:
+			weightMessage, ok := msg.(*messages.WeightsMessage)
+			if !ok {
+				continue
+			}
+			weights = append(weights, weightMessage.Weights)
+		case <-timer.C:
+			n.f.WriteString(fmt.Sprintf("[%d]: Received only %d weights\n", n.Id, len(weights)))
+			break membersLoop
+		}
+
+	}
+	return matrix.CalculateAverageWeights(weights)
+}
+
+func (n *Node) handleClusterHeadsWeightExchange(averageWeights [][][]float64, clusters map[int][]int) [][][]float64 {
+	// send average weights to all cluster heads
+	for clusterId := range clusters {
+		// don't send to itself
+		if clusterId == n.PCH[d].Id {
+			continue
+		}
+		n.sendMsg(messages.NewMessage(n.Id, clusterId, messages.DefaultTTL, &messages.ClusterWeightsMessage{
+			SenderId:       n.Id,
+			AverageWeights: averageWeights,
+		}))
+		n.f.WriteString(fmt.Sprintf("[%d]: Sent cluster message to: %d\n", n.Id, clusterId))
+	}
+
+	// receive average weights from other cluster heads
+	averageWeightsFromClusters := make([][][][]float64, 1, len(clusters))
+	averageWeightsFromClusters[0] = averageWeights
+
+	// since there is no path to all cluster heads, if cluster doesnt receive
+	// a message from a cluster head, in 500ms, it stops waiting
+	// and calculates the average weights
+	timer := time.NewTimer(500 * time.Millisecond)
+	defer timer.Stop()
+
+	// receive average weights from all other cluster heads
+clustersLoop:
+	for range len(clusters)-1 {
+		select {
+		case msg := <-n.internalChans[ClusterWeightsService]:
+			weightMessage, ok := msg.(*messages.ClusterWeightsMessage)
+			if !ok {
+				continue
+			}
+			averageWeightsFromClusters = append(averageWeightsFromClusters, weightMessage.AverageWeights)
+		case <-timer.C:
+			n.f.WriteString(fmt.Sprintf("[%d]: Received only: %d/%d weights from chs\n", n.Id, len(averageWeightsFromClusters), len(clusters)))
+			break clustersLoop
+		}
+	}
+
+	// calculate average of all cluster heads
+	totalAverage := matrix.CalculateAverageWeights(averageWeightsFromClusters)
+	n.f.WriteString(fmt.Sprintf("[%d]: Received %d weights\n", n.Id, len(averageWeightsFromClusters)-1))
+	return totalAverage
+}
+
 // TODO: change cluster size and fix function (no if/else) split ?
 func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 	myCluster := clusters[n.PCH[d].Id]
 	clusterSize := len(myCluster)
+
 	if n.IsCH() {
 		n.f.WriteString(fmt.Sprintf("[%d]: Expecting %d weights\n", n.Id, clusterSize-1))
-		weights := make([][][][]float64, 1, clusterSize)
-		weights[0] = n.gru.GetWeights()
-		timer := time.NewTimer(500 * time.Millisecond)
-		defer timer.Stop()
-	membersLoop:
-		for len(weights) < clusterSize {
-			select {
-			case msg := <-n.internalChans[WeightsService]:
-				weightMessage, ok := msg.(*messages.WeightsMessage)
-				if !ok {
-					continue
-				}
-				weights = append(weights, weightMessage.Weights)
-			case <-timer.C:
-				n.f.WriteString(fmt.Sprintf("[%d]: Received only %d weights\n", n.Id, len(weights)))
-				break membersLoop
-			}
 
-		}
-		averageWeights := matrix.CalculateAverageWeights(weights)
-		n.f.WriteString(fmt.Sprintf("[%d]: Calculate average\n", n.Id))
+		n.handleParsevalExchange(clusterSize)
 
-		// send average weights to all cluster heads
-		for clusterId := range clusters {
-			// don't send to itself
-			if clusterId == n.PCH[d].Id {
-				continue
-			}
-			n.sendMsg(messages.NewMessage(n.Id, clusterId, messages.DefaultTTL, &messages.ClusterWeightsMessage{
-				SenderId:       n.Id,
-				AverageWeights: averageWeights,
-			}))
-			n.f.WriteString(fmt.Sprintf("[%d]: Sent cluster message to: %d\n", n.Id, clusterId))
-		}
+		averageMembersWeights := n.handleMembersWeightExchange(clusterSize)
 
-		// receive average weights from other cluster heads
-		averageWeightsFromClusters := make([][][][]float64, 1, len(clusters))
-		averageWeightsFromClusters[0] = averageWeights
+		totalAverage := n.handleClusterHeadsWeightExchange(averageMembersWeights, clusters)
 
-		// since there is no path to all cluster heads, if cluster doesnt receive
-		// a message from a cluster head, in 100ms, it stops waiting
-		// and calculates the average weights
-
-		timer = time.NewTimer(500 * time.Millisecond)
-	clustersLoop:
-		for range len(clusters) {
-			select {
-			case msg := <-n.internalChans[ClusterWeightsService]:
-				weightMessage, ok := msg.(*messages.ClusterWeightsMessage)
-				if !ok {
-					continue
-				}
-				averageWeightsFromClusters = append(averageWeightsFromClusters, weightMessage.AverageWeights)
-			case <-timer.C:
-				break clustersLoop
-			}
-		}
-
-		totalAverage := matrix.CalculateAverageWeights(averageWeightsFromClusters)
-		n.f.WriteString(fmt.Sprintf("[%d]: Received %d weights\n", n.Id, len(averageWeightsFromClusters)-1))
+		// send average weights back to members
 		for _, nodeId := range myCluster {
 			if nodeId != n.Id {
 				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: totalAverage}))
@@ -251,7 +283,9 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		n.f.WriteString(fmt.Sprintf("[%d]: Finished exchanging weights\n", n.Id))
 		return
 	}
+
 	// this is executed only by the cluster members
+	n.SendParsevalValues()
 	n.SendWeights()
 	timer := time.NewTimer(1 * time.Second)
 	defer timer.Stop()
@@ -271,6 +305,23 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 	}
 }
 
+func (n *Node) SendParsevalValues() {
+	weights := n.gru.GetWeights()
+	parsevalValues := make([][]float64, len(weights))
+	for i, weight := range weights {
+		parsevalValue := matrix.Parseval(matrix.FFT(matrix.Flatten(weight)))
+		if len(parsevalValue) > ParsevalValuesToSend {
+			parsevalValue = parsevalValue[:ParsevalValuesToSend]
+		}
+		parsevalValues[i] = parsevalValue
+	}
+
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[d].Id, messages.DefaultTTL, &messages.ParsevalMessage{
+		SenderId:       n.Id,
+		ParsevalValues: parsevalValues,
+	}))
+
+}
 func (n *Node) printPCH() {
 	fmt.Printf("[%d]: PCH: %d\n", n.Id, n.PCH[d].Id)
 	fmt.Printf("[%d]: ", n.Id)
@@ -448,6 +499,8 @@ func (n *Node) Start(ctx context.Context, d int) {
 				go n.handleWeightsMessage(msg)
 			case *messages.ClusterWeightsMessage:
 				go n.handleClusterWeightsMessage(msg)
+			case *messages.ParsevalMessage:
+				go n.handleParsevalMessage(msg)
 			}
 		case <-ctx.Done():
 			n.f.WriteString(fmt.Sprintf("[%d]: Terminating...\n", n.Id))
@@ -456,6 +509,10 @@ func (n *Node) Start(ctx context.Context, d int) {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
+}
+
+func (n *Node) handleParsevalMessage(msg *messages.ParsevalMessage) {
+	n.internalChans[ParsevalService] <- msg
 }
 func (n *Node) handleWeightsMessage(msg *messages.WeightsMessage) {
 	n.internalChans[WeightsService] <- msg

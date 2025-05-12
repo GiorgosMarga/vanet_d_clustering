@@ -68,8 +68,8 @@ func main() {
 
 	for _, node := range g.Nodes {
 		if node.IsCH() {
-			fmt.Printf("Node [%d] train and predict\n", node.Id)
-			node.Train()
+			fmt.Printf("Node [%d] predict\n", node.Id)
+			// node.Train()
 			node.Predict()
 		}
 	}

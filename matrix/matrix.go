@@ -285,8 +285,7 @@ func Parseval(arr []complex128) []float64 {
 	return res
 }
 
-func CalcEuclidianDist(arr1, arr2 []float64) float64 {
-
+func CalculateMatDistance(arr1, arr2 []float64) float64 {
 	res := 0.0
 
 	if len(arr1) != len(arr2) {
@@ -297,5 +296,4 @@ func CalcEuclidianDist(arr1, arr2 []float64) float64 {
 	}
 
 	return res
-
 }

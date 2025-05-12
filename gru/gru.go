@@ -319,7 +319,7 @@ func (g *GRU) resetGradients() {
 }
 
 func (g *GRU) GetWeights() [][][]float64 {
-	weights := make([][][]float64, 9)
+	weights := make([][][]float64, 10)
 
 	weights[0] = g.Whx
 	weights[1] = g.Whh
@@ -330,12 +330,13 @@ func (g *GRU) GetWeights() [][][]float64 {
 	weights[6] = g.ResetGate.dWX
 	weights[7] = g.ResetGate.dWH
 	weights[8] = g.ResetGate.bias
+	weights[9] = g.wOut
 	return weights
 }
 
 func (g *GRU) SetWeights(weights [][][]float64) error {
-	if len(weights) != 9 {
-		return fmt.Errorf("weights length: %d, expected: 9", len(weights))
+	if len(weights) != 10 {
+		return fmt.Errorf("weights length: %d, expected: 10", len(weights))
 	}
 
 	g.Whx = weights[0]
@@ -347,6 +348,7 @@ func (g *GRU) SetWeights(weights [][][]float64) error {
 	g.ResetGate.dWX = weights[6]
 	g.ResetGate.dWH = weights[7]
 	g.ResetGate.bias = weights[8]
+	g.wOut = weights[9]
 	return nil
 }
 func R2Score(yActual, yPred [][]float64) float64 {

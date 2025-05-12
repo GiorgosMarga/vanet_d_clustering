@@ -6,3 +6,7 @@ sumo/
 test_results.txt
 snapshots/
 graph.info
+pythonNeural/
+pythonNetworkServer/
+generatePlots.py
+plots/
