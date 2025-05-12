@@ -64,12 +64,12 @@ func main() {
 			log.Fatal("Generating SUMO:", err)
 		}
 		fmt.Printf("Filename: %s -> Connectivity: %d%% | Clusters: %d | AverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
-
 	}
 
 	for _, node := range g.Nodes {
 		if node.IsCH() {
-			node.Train()
+			fmt.Printf("Node [%d] predict\n", node.Id)
+			// node.Train()
 			node.Predict()
 		}
 	}

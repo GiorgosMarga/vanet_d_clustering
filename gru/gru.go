@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/GiorgosMarga/vanet_d_clustering/matrix"
 )
 
 type LossFunction func(yActual [][]float64, yPred [][]float64) float64
@@ -78,22 +80,22 @@ type GRU struct {
 
 func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, learningRate, trainingSize float64) *GRU {
 	scale := 1.0 / float64(hiddenSize) // Xavier-like scaling
-	updateGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
-	resetGate := NewGate(randomMatrix(hiddenSize, 1, scale), randomMatrix(hiddenSize, hiddenSize, scale), randomMatrix(hiddenSize, inputSize, scale), sigmoid)
+	updateGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
+	resetGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	return &GRU{
 		UpdateGate:   updateGate,
 		ResetGate:    resetGate,
-		Whx:          randomMatrix(hiddenSize, inputSize, scale),
-		Whh:          randomMatrix(hiddenSize, hiddenSize, scale),
-		bh:           randomMatrix(hiddenSize, 1, scale),
-		finalH:       randomMatrix(hiddenSize, 1, 0),
+		Whx:          matrix.RandomMatrix(hiddenSize, inputSize, scale),
+		Whh:          matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
+		bh:           matrix.RandomMatrix(hiddenSize, 1, scale),
+		finalH:       matrix.RandomMatrix(hiddenSize, 1, 0),
 		lossFunction: lossFunction,
 		hiddenSize:   hiddenSize,
-		dWhiddenX:    randomMatrix(hiddenSize, inputSize, scale),
-		dWhiddenH:    randomMatrix(hiddenSize, hiddenSize, scale),
-		dbhidden:     randomMatrix(hiddenSize, 1, scale),
-		wOut:         randomMatrix(1, hiddenSize, scale),
-		bOut:         randomMatrix(1, 1, scale),
+		dWhiddenX:    matrix.RandomMatrix(hiddenSize, inputSize, scale),
+		dWhiddenH:    matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
+		dbhidden:     matrix.RandomMatrix(hiddenSize, 1, scale),
+		wOut:         matrix.RandomMatrix(1, hiddenSize, scale),
+		bOut:         matrix.RandomMatrix(1, 1, scale),
 		learningRate: learningRate,
 		earlyStop:    NewEarlyStop(patience, 0.001),
 		Errors:       make([]float64, 0),
@@ -116,8 +118,8 @@ func shuffleData(X, Y [][][]float64) {
 }
 
 func (g *GRU) calculateCandidateHiddenState() [][]float64 {
-	a := matrixMul(g.Whx, g.Input)
-	b := matrixMul(g.Whh, elementMatrixMul(g.r, g.prevH))
+	a := matrix.MatrixMul(g.Whx, g.Input)
+	b := matrix.MatrixMul(g.Whh, matrix.ElementMatrixMul(g.r, g.prevH))
 
 	g.candidateH = make([][]float64, len(a))
 	for row := range a {
@@ -137,10 +139,10 @@ func (g *GRU) Predict(X [][]float64) ([][]float64, error) {
 }
 
 func (g *GRU) calculateFinalHiddenState() [][]float64 {
-	a := elementMatrixMul(g.z, g.prevH)
-	b := matrixSub(identityMatrix(len(g.z), len(g.z[0])), g.z)
+	a := matrix.ElementMatrixMul(g.z, g.prevH)
+	b := matrix.MatrixSub(matrix.IdentityMatrix(len(g.z), len(g.z[0])), g.z)
 
-	return matrixAdd(a, elementMatrixMul(b, g.candidateH))
+	return matrix.MatrixAdd(a, matrix.ElementMatrixMul(b, g.candidateH))
 }
 
 func (g *GRU) forwardPass() ([][]float64, error) {
@@ -159,7 +161,7 @@ func (g *GRU) forwardPass() ([][]float64, error) {
 
 	g.candidateH = g.calculateCandidateHiddenState()
 	g.finalH = g.calculateFinalHiddenState()
-	g.output = matrixAdd(matrixMul(g.wOut, g.finalH), g.bOut)
+	g.output = matrix.MatrixAdd(matrix.MatrixMul(g.wOut, g.finalH), g.bOut)
 	return g.output, nil
 }
 
@@ -184,56 +186,56 @@ func (g *GRU) backwardPass(yActual [][]float64) error {
 	// Compute gradient of loss w.r.t. output (dOutput)
 	dOutput := computeLossGrad(g.output, yActual) // dOutput is [1x1]
 	// Compute gradient of loss w.r.t. W_out (dW_out)
-	dWout := matrixMul(dOutput, transposeMatrix(g.finalH)) // dW_out is [1x hiddenSize]
+	dWout := matrix.MatrixMul(dOutput, matrix.TransposeMatrix(g.finalH)) // dW_out is [1x hiddenSize]
 
 	// Compute gradient of loss w.r.t. b_out (db_out)
 	dbout := dOutput // db_out is [1x1]
 
 	// Compute gradient of loss w.r.t. finalH (dFinalH)
-	dH := matrixMul(transposeMatrix(g.wOut), dOutput) // dFinalH is [hiddenSize x 1]
+	dH := matrix.MatrixMul(matrix.TransposeMatrix(g.wOut), dOutput) // dFinalH is [hiddenSize x 1]
 
 	// Update output layer parameters
-	g.wOut = matrixSubWithScalar(g.wOut, dWout, g.learningRate)
-	g.bOut = matrixSubWithScalar(g.bOut, dbout, g.learningRate)
+	g.wOut = matrix.MatrixSubWithScalar(g.wOut, dWout, g.learningRate)
+	g.bOut = matrix.MatrixSubWithScalar(g.bOut, dbout, g.learningRate)
 
 	// gradients for update gate
-	dz := elementMatrixMul(matrixSub(g.prevH, g.candidateH), dH)
-	sigmoidDerivZ := elementMatrixMul(g.z, matrixSub(identityMatrix(len(g.z), len(g.z[0])), g.z))
-	deltaZ := elementMatrixMul(dz, sigmoidDerivZ)
+	dz := matrix.ElementMatrixMul(matrix.MatrixSub(g.prevH, g.candidateH), dH)
+	sigmoidDerivZ := matrix.ElementMatrixMul(g.z, matrix.MatrixSub(matrix.IdentityMatrix(len(g.z), len(g.z[0])), g.z))
+	deltaZ := matrix.ElementMatrixMul(dz, sigmoidDerivZ)
 
-	g.UpdateGate.dWX = matrixAdd(g.UpdateGate.dWX, matrixMul(deltaZ, transposeMatrix(g.Input)))
-	g.UpdateGate.dWH = matrixAdd(g.UpdateGate.dWH, matrixMul(deltaZ, transposeMatrix(g.prevH)))
-	g.UpdateGate.db = matrixAdd(g.UpdateGate.db, sumRows(deltaZ))
+	g.UpdateGate.dWX = matrix.MatrixAdd(g.UpdateGate.dWX, matrix.MatrixMul(deltaZ, matrix.TransposeMatrix(g.Input)))
+	g.UpdateGate.dWH = matrix.MatrixAdd(g.UpdateGate.dWH, matrix.MatrixMul(deltaZ, matrix.TransposeMatrix(g.prevH)))
+	g.UpdateGate.db = matrix.MatrixAdd(g.UpdateGate.db, matrix.SumRows(deltaZ))
 
 	// gradient for Candidate Hidden State
-	dCandidateH := elementMatrixMul(matrixSub(identityMatrix(len(g.z), len(g.z[0])), g.z), dH)
-	tanhDeriv := matrixSub(identityMatrix(len(g.candidateH), len(g.candidateH[0])), elementMatrixMul(g.candidateH, g.candidateH))
+	dCandidateH := matrix.ElementMatrixMul(matrix.MatrixSub(matrix.IdentityMatrix(len(g.z), len(g.z[0])), g.z), dH)
+	tanhDeriv := matrix.MatrixSub(matrix.IdentityMatrix(len(g.candidateH), len(g.candidateH[0])), matrix.ElementMatrixMul(g.candidateH, g.candidateH))
 
-	deltaA := elementMatrixMul(dCandidateH, tanhDeriv)
+	deltaA := matrix.ElementMatrixMul(dCandidateH, tanhDeriv)
 
-	g.dWhiddenX = matrixAdd(g.dWhiddenX, matrixMul(deltaA, transposeMatrix(g.Input)))
-	WhhPrevH := matrixMul(g.Whh, g.prevH)
-	g.dWhiddenH = matrixAdd(g.dWhiddenH, matrixMul(elementMatrixMul(g.r, deltaA), transposeMatrix(g.prevH)))
-	g.dbhidden = matrixAdd(g.dbhidden, sumRows(deltaA))
+	g.dWhiddenX = matrix.MatrixAdd(g.dWhiddenX, matrix.MatrixMul(deltaA, matrix.TransposeMatrix(g.Input)))
+	WhhPrevH := matrix.MatrixMul(g.Whh, g.prevH)
+	g.dWhiddenH = matrix.MatrixAdd(g.dWhiddenH, matrix.MatrixMul(matrix.ElementMatrixMul(g.r, deltaA), matrix.TransposeMatrix(g.prevH)))
+	g.dbhidden = matrix.MatrixAdd(g.dbhidden, matrix.SumRows(deltaA))
 
 	// Gradient for Reset Gate (r)
-	drCandidate := elementMatrixMul(WhhPrevH, deltaA)
-	sigmoidDerivR := elementMatrixMul(g.r, matrixSub(identityMatrix(len(g.r), len(g.r[0])), g.r))
-	deltaR := elementMatrixMul(drCandidate, sigmoidDerivR)
+	drCandidate := matrix.ElementMatrixMul(WhhPrevH, deltaA)
+	sigmoidDerivR := matrix.ElementMatrixMul(g.r, matrix.MatrixSub(matrix.IdentityMatrix(len(g.r), len(g.r[0])), g.r))
+	deltaR := matrix.ElementMatrixMul(drCandidate, sigmoidDerivR)
 
-	g.ResetGate.dWX = matrixAdd(g.ResetGate.dWX, matrixMul(deltaR, transposeMatrix(g.Input)))
-	g.ResetGate.dWH = matrixAdd(g.ResetGate.dWH, matrixMul(deltaR, transposeMatrix(g.prevH)))
-	g.ResetGate.db = matrixAdd(g.ResetGate.db, sumRows(deltaR))
+	g.ResetGate.dWX = matrix.MatrixAdd(g.ResetGate.dWX, matrix.MatrixMul(deltaR, matrix.TransposeMatrix(g.Input)))
+	g.ResetGate.dWH = matrix.MatrixAdd(g.ResetGate.dWH, matrix.MatrixMul(deltaR, matrix.TransposeMatrix(g.prevH)))
+	g.ResetGate.db = matrix.MatrixAdd(g.ResetGate.db, matrix.SumRows(deltaR))
 
 	return nil
 }
 
 func (g *GRU) updateWeights() {
-	g.Whx = matrixSubWithScalar(g.Whx, g.dWhiddenX, g.learningRate)
+	g.Whx = matrix.MatrixSubWithScalar(g.Whx, g.dWhiddenX, g.learningRate)
 
-	g.Whh = matrixSubWithScalar(g.Whh, g.dWhiddenH, g.learningRate)
+	g.Whh = matrix.MatrixSubWithScalar(g.Whh, g.dWhiddenH, g.learningRate)
 
-	g.bh = matrixSubWithScalar(g.bh, g.dbhidden, g.learningRate)
+	g.bh = matrix.MatrixSubWithScalar(g.bh, g.dbhidden, g.learningRate)
 	g.UpdateGate.updateWeights(g.learningRate)
 	g.ResetGate.updateWeights(g.learningRate)
 
@@ -251,7 +253,8 @@ func (g *GRU) Train(epochs, batchSize int) error {
 	inputs := g.X[:trainSize]
 	targets := g.Y[:trainSize]
 	g.initializeHiddenState(g.hiddenSize)
-	for range epochs {
+	for epoch := range epochs {
+		_ = epoch
 		var totalLoss float64 = 0
 
 		for batch := 0; batch < len(inputs); batch += batchSize {
@@ -316,7 +319,7 @@ func (g *GRU) resetGradients() {
 }
 
 func (g *GRU) GetWeights() [][][]float64 {
-	weights := make([][][]float64, 9)
+	weights := make([][][]float64, 10)
 
 	weights[0] = g.Whx
 	weights[1] = g.Whh
@@ -327,12 +330,13 @@ func (g *GRU) GetWeights() [][][]float64 {
 	weights[6] = g.ResetGate.dWX
 	weights[7] = g.ResetGate.dWH
 	weights[8] = g.ResetGate.bias
+	weights[9] = g.wOut
 	return weights
 }
 
 func (g *GRU) SetWeights(weights [][][]float64) error {
-	if len(weights) != 9 {
-		return fmt.Errorf("weights length: %d, expected: 9", len(weights))
+	if len(weights) != 10 {
+		return fmt.Errorf("weights length: %d, expected: 10", len(weights))
 	}
 
 	g.Whx = weights[0]
@@ -344,6 +348,7 @@ func (g *GRU) SetWeights(weights [][][]float64) error {
 	g.ResetGate.dWX = weights[6]
 	g.ResetGate.dWH = weights[7]
 	g.ResetGate.bias = weights[8]
+	g.wOut = weights[9]
 	return nil
 }
 func R2Score(yActual, yPred [][]float64) float64 {
@@ -414,7 +419,7 @@ func (g *GRU) ParseFile(filename string) error {
 
 }
 
-func (g *GRU) Evaluate() error {
+func (g *GRU) Evaluate() ([]float64, []float64, error) {
 	dataSize := int(float64(len(g.X)) * g.trainingSize)
 	X := g.X[dataSize:]
 	Y := g.Y[dataSize:]
@@ -425,11 +430,14 @@ func (g *GRU) Evaluate() error {
 	for i := range len(X) {
 		output, err := g.Predict(X[i])
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		predictions = append(predictions, g.Sx.InverseTransform([][][]float64{output})[0][0][0])
 		expected = append(expected, g.Sy.InverseTransform([][][]float64{Y[i]})[0][0][0])
 	}
-	return nil
+	return predictions, expected, nil
 
+}
+func (g *GRU) GetErrors() []float64 {
+	return g.Errors
 }

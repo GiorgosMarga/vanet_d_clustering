@@ -1,4 +1,4 @@
-package gru
+package matrix
 
 import (
 	"fmt"
@@ -11,11 +11,11 @@ func getDims(matrix [][]float64) (int, int) {
 	return len(matrix), len(matrix[0])
 }
 
-func printDims(matrix [][]float64, matrixName string) {
+func PrintDims(matrix [][]float64, matrixName string) {
 	a, b := getDims(matrix)
 	fmt.Printf("%s: (%dx%d)\n", matrixName, a, b)
 }
-func elementMatrixMul(a, b [][]float64) [][]float64 {
+func ElementMatrixMul(a, b [][]float64) [][]float64 {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("a and b have different dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
 	}
@@ -40,7 +40,7 @@ func elementMatrixMul(a, b [][]float64) [][]float64 {
 	return result
 
 }
-func identityMatrix(rows, cols int) [][]float64 {
+func IdentityMatrix(rows, cols int) [][]float64 {
 	res := make([][]float64, rows)
 	for row := range res {
 		res[row] = make([]float64, cols)
@@ -50,7 +50,7 @@ func identityMatrix(rows, cols int) [][]float64 {
 	}
 	return res
 }
-func matrixMul(a, b [][]float64) [][]float64 {
+func MatrixMul(a, b [][]float64) [][]float64 {
 	if len(a[0]) != len(b) {
 		panic(fmt.Sprintf("Mul: Invalid dimensions: a:(%dx%d) * b(%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
 	}
@@ -72,7 +72,7 @@ func matrixMul(a, b [][]float64) [][]float64 {
 	return result
 }
 
-func matrixAdd(a, b [][]float64) [][]float64 {
+func MatrixAdd(a, b [][]float64) [][]float64 {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("Add: Invalid dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
 	}
@@ -89,7 +89,7 @@ func matrixAdd(a, b [][]float64) [][]float64 {
 
 }
 
-func matrixSub(a, b [][]float64) [][]float64 {
+func MatrixSub(a, b [][]float64) [][]float64 {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("Sub: Invalid dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
 	}
@@ -105,7 +105,7 @@ func matrixSub(a, b [][]float64) [][]float64 {
 	return output
 }
 
-func matrixSubWithScalar(a, b [][]float64, scale float64) [][]float64 {
+func MatrixSubWithScalar(a, b [][]float64, scale float64) [][]float64 {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("SubScale: Invalid dimensions (%dx%d) and (%dx%d)\n", len(a), len(a[0]), len(b), len(b[0])))
 	}
@@ -122,7 +122,7 @@ func matrixSubWithScalar(a, b [][]float64, scale float64) [][]float64 {
 
 }
 
-func matrixOuterProduct(a, b [][]float64) [][]float64 {
+func MatrixOuterProduct(a, b [][]float64) [][]float64 {
 	m := len(a)
 	n := len(b)
 	result := make([][]float64, m)
@@ -134,7 +134,7 @@ func matrixOuterProduct(a, b [][]float64) [][]float64 {
 	}
 	return result
 }
-func randomMatrix(rows, cols int, scale float64) [][]float64 {
+func RandomMatrix(rows, cols int, scale float64) [][]float64 {
 	matrix := make([][]float64, rows)
 	for i := range matrix {
 		matrix[i] = make([]float64, cols)
@@ -145,7 +145,7 @@ func randomMatrix(rows, cols int, scale float64) [][]float64 {
 	return matrix
 }
 
-func transposeMatrix(a [][]float64) [][]float64 {
+func TransposeMatrix(a [][]float64) [][]float64 {
 	res := make([][]float64, len(a[0]))
 	for rowIdx := range res {
 		res[rowIdx] = make([]float64, len(a))
@@ -157,7 +157,7 @@ func transposeMatrix(a [][]float64) [][]float64 {
 	}
 	return res
 }
-func sumRows(matrix [][]float64) [][]float64 {
+func SumRows(matrix [][]float64) [][]float64 {
 	rows := len(matrix)
 	cols := len(matrix[0])
 	sum := make([][]float64, rows)
@@ -171,7 +171,7 @@ func sumRows(matrix [][]float64) [][]float64 {
 	return sum
 }
 
-func matrixScale(a [][]float64, scaler float64) [][]float64 {
+func MatrixScale(a [][]float64, scaler float64) [][]float64 {
 	res := make([][]float64, len(a))
 	for row := range a {
 		res[row] = make([]float64, len(a[row]))
@@ -182,7 +182,7 @@ func matrixScale(a [][]float64, scaler float64) [][]float64 {
 	return res
 }
 
-func matrixAverage(matrices [][][]float64) [][]float64 {
+func MatrixAverage(matrices [][][]float64) [][]float64 {
 	if len(matrices) == 1 {
 		return matrices[0]
 	}
@@ -206,7 +206,7 @@ func matrixAverage(matrices [][][]float64) [][]float64 {
 			}
 		}
 	}
-	return matrixScale(t, 1/float64(len(matrices)))
+	return MatrixScale(t, 1/float64(len(matrices)))
 }
 
 func CalculateAverageWeights(matrices [][][][]float64) [][][]float64 {
@@ -219,7 +219,7 @@ func CalculateAverageWeights(matrices [][][][]float64) [][][]float64 {
 		for idx := range matrices {
 			weightsToProcess[idx] = matrices[idx][weightType]
 		}
-		average[weightType] = matrixAverage(weightsToProcess)
+		average[weightType] = MatrixAverage(weightsToProcess)
 	}
 	return average
 }
@@ -256,4 +256,44 @@ func fftRec(x []complex128, N int) {
 		x[k] = even[k] + t
 		x[N/2+k] = even[k] - t
 	}
+}
+
+func Flatten(arr [][]float64) []float64 {
+	newArr := make([]float64, len(arr)*len(arr[0]))
+	for i, a := range arr {
+		copy(newArr[i*len(arr[0]):], a)
+	}
+	return newArr
+}
+
+func Flatten2(arr [][]float64) []float64 {
+	newArr := make([]float64, 0, len(arr)*len(arr[0]))
+
+	for _, row := range arr {
+		newArr = append(newArr, row...)
+	}
+
+	return newArr
+}
+
+func Parseval(arr []complex128) []float64 {
+	res := make([]float64, len(arr))
+
+	for i, c := range arr {
+		res[i] = cmplx.Abs(c)
+	}
+	return res
+}
+
+func CalculateMatDistance(arr1, arr2 []float64) float64 {
+	res := 0.0
+
+	if len(arr1) != len(arr2) {
+		panic("Different length")
+	}
+	for i := range arr1 {
+		res += math.Abs(arr1[i] - arr2[i])
+	}
+
+	return res
 }

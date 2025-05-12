@@ -1,9 +1,13 @@
 package pythonneural
 
 import (
-	"bytes"
 	"encoding/json"
+	"fmt"
+	"math/rand/v2"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -34,17 +38,7 @@ func NewPythonNeural(address string) (*PythonNeural, error) {
 		return nil, err
 	}
 
-	dataMsg := ServerMessage{
-		Type: SendData,
-		Msg: map[string]any{
-			"X": [][][]float64{{{1.0}, {2.0}, {3.0}, {4.0}}, {{5.0}, {6.0}, {7.0}, {8.0}}},
-			"Y": [][][]float64{{{5.0}}, {{6.0}}},
-		},
-	}
-
-	if err := json.NewEncoder(conn).Encode(dataMsg); err != nil {
-		return nil, err
-	}
+	//
 
 	return &PythonNeural{
 		conn: conn,
@@ -52,6 +46,18 @@ func NewPythonNeural(address string) (*PythonNeural, error) {
 
 }
 
+func (pn *PythonNeural) SendData(X, Y [][][]float64, id int) error {
+	dataMsg := ServerMessage{
+		Type: SendData,
+		Msg: map[string]any{
+			"X":  X,
+			"Y":  Y,
+			"id": id,
+		},
+	}
+
+	return json.NewEncoder(pn.conn).Encode(dataMsg)
+}
 func (pn *PythonNeural) SetWeights(weights [][][]float64) error {
 	// send set weights message
 	newMsg := ServerMessage{
@@ -63,19 +69,20 @@ func (pn *PythonNeural) SetWeights(weights [][][]float64) error {
 	return json.NewEncoder(pn.conn).Encode(newMsg)
 }
 func (pn *PythonNeural) Predict(X [][]float64) ([][]float64, error) {
+
+	tx := make([][][]float64, 100)
+	for i := range 100 {
+		tx[i] = [][]float64{{float64(i + 1000), float64(i + 1001), float64(i + 1002), float64(i + 1003)}}
+	}
 	// send predict message
 	newMsg := ServerMessage{
 		Type: Predict,
 		Msg: map[string]any{
-			"x": X,
+			"x": tx,
 		},
 	}
-	b := new(bytes.Buffer)
-	err := json.NewEncoder(b).Encode(newMsg)
-	if err != nil {
-		return nil, err
-	}
-	_, err = pn.conn.Write(b.Bytes())
+	err := json.NewEncoder(pn.conn).Encode(newMsg)
+	//TODO: CHANGE THIS
 	return nil, err
 }
 func (pn *PythonNeural) Train(epochs, batchSize int) error {
@@ -87,13 +94,19 @@ func (pn *PythonNeural) Train(epochs, batchSize int) error {
 			"batchSize": batchSize,
 		},
 	}
-	b := new(bytes.Buffer)
-	err := json.NewEncoder(b).Encode(newMsg)
+	err := json.NewEncoder(pn.conn).Encode(newMsg)
 	if err != nil {
 		return err
 	}
-	_, err = pn.conn.Write(b.Bytes())
-	return err
+
+	b := make([]byte, 1024)
+	_, err = pn.conn.Read(b)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Finished Training")
+	return nil
 }
 
 func (pn *PythonNeural) GetWeights() [][][]float64 {
@@ -116,11 +129,59 @@ func (pn *PythonNeural) Evaluate() error {
 	newMsg := ServerMessage{
 		Type: Evaluate,
 	}
-	b := new(bytes.Buffer)
-	err := json.NewEncoder(b).Encode(newMsg)
-	if err != nil {
-		return err
-	}
-	_, err = pn.conn.Write(b.Bytes())
+	err := json.NewEncoder(pn.conn).Encode(newMsg)
+
 	return err
+}
+
+func (pn *PythonNeural) ParseFile(filename string) ([][][]float64, [][][]float64, error) {
+	f, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	lines := strings.Split(string(f[:len(f)-1]), "\n")
+	var X [][][]float64
+	var Y [][][]float64
+	for line := range len(lines) {
+		if line+5 > len(lines) {
+			break
+		}
+		t := make([][]float64, 4)
+		for i := range 4 {
+			n, err := strconv.ParseFloat(lines[line+i], 64)
+			if err != nil {
+				panic(err)
+			}
+			t[i] = []float64{n}
+		}
+		X = append(X, t)
+		n, err := strconv.ParseFloat(lines[line+4], 64)
+		if err != nil {
+			panic(err)
+		}
+		t2 := make([][]float64, 1)
+		t2[0] = []float64{n}
+		Y = append(Y, t2)
+	}
+
+	shuffleData(X, Y)
+
+	// g.X = g.Sx.FitTransform(X)
+	// g.Y = g.Sy.FitTransform(Y)
+
+	return X, Y, nil
+
+}
+
+func shuffleData(X, Y [][][]float64) {
+	if len(X) != len(Y) {
+		panic("X and Y must have the same number of samples")
+	}
+
+	// Shuffle in place.
+	rand.Shuffle(len(X), func(i, j int) {
+		X[i], X[j] = X[j], X[i]
+		Y[i], Y[j] = Y[j], Y[i]
+	})
 }
