@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -202,13 +204,38 @@ func (g *Graph) GenerateSUMOFile(filename string) error {
 	return nil
 }
 
+func (g *Graph) orderNodes() []*node.Node {
+	ordered := make([]*node.Node, 0, len(g.Nodes))
+
+	for _, v := range g.Nodes {
+		ordered = append(ordered, v)
+	}
+
+	slices.SortFunc(ordered, func(a, b *node.Node) int {
+		return cmp.Compare(a.Id, b.Id)
+	})
+	return ordered
+}
+
+func (g *Graph) orderClusters() []int {
+	ordered := make([]int, 0, len(g.Nodes))
+
+	for k := range g.clusters {
+		ordered = append(ordered, k)
+	}
+
+	sort.Ints(ordered)
+	return ordered
+}
+
 func (g *Graph) DHCV() {
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
 	beaconCTX, cancelBeacon := context.WithCancel(context.Background())
 	defer cancel()
 
-	for _, n := range g.Nodes {
+	orderedNodes := g.orderNodes()
+	for _, n := range orderedNodes {
 		go n.Beacon(beaconCTX)
 		go n.Start(ctx, g.d)
 		wg.Add(1)
@@ -219,8 +246,9 @@ func (g *Graph) DHCV() {
 	}
 	wg.Wait()
 	g.formClusters()
+	g.f.WriteString("Starting Exceptions\n")
 	// exception 1
-	for _, n := range g.Nodes {
+	for _, n := range orderedNodes {
 		ch := n.PCH[g.d]
 		if ch.Id == n.Id {
 			continue
@@ -245,9 +273,13 @@ func (g *Graph) DHCV() {
 	g.Log(fmt.Sprintln(g.clusters))
 
 	g.Log(fmt.Sprintln("Exception 2"))
+
 	// exception 2
+	orderedClusters := g.orderClusters()
 exceptionLoop:
-	for chId, cluster := range g.clusters {
+	for idx := range orderedClusters {
+		chId := orderedClusters[idx]
+		cluster := g.clusters[chId]
 		// ch did not select itself as ch
 		ch := g.Nodes[chId]
 		if !slices.Contains(cluster, chId) {
@@ -270,14 +302,18 @@ exceptionLoop:
 				n.PCH[g.d] = ch.PCH[g.d]
 			}
 			delete(g.clusters, chId)
+			g.orderClusters()
 		}
 	}
 	g.formClusters()
 	g.Log(fmt.Sprintln(g.clusters))
 	g.Log(fmt.Sprintln("Exception 3"))
 	// exception 3
+
+	orderedClusters = g.orderClusters()
 exception3Loop:
-	for chId, cluster := range g.clusters {
+	for _, chId := range orderedClusters {
+		cluster := g.clusters[chId]
 		if len(cluster) == 1 {
 			// CH with no CMs
 			n := g.Nodes[chId]
@@ -298,9 +334,12 @@ exception3Loop:
 	g.formClusters()
 	g.Log(fmt.Sprintln(g.clusters))
 	g.Log(fmt.Sprintln("Merge clusters"))
+
 	// merge clusters
 mergeLoop:
-	for ch, cluster := range g.clusters {
+	for idx := range orderedClusters {
+		ch := orderedClusters[idx]
+		cluster := g.clusters[ch]
 		if len(cluster) <= g.minClusterNumber {
 			currCh := g.Nodes[ch]
 			g.Log(fmt.Sprintf("Found cluster with min members: %d\n", ch))
@@ -308,7 +347,8 @@ mergeLoop:
 			var bestChNode *node.Node
 			// TODO: search neighbor to d to find CHs
 			// checks all CHs that have distance <= d and calculates the relative mobility
-			for newPotentialCh := range g.clusters {
+			tOrdered := g.orderClusters()
+			for _, newPotentialCh := range tOrdered {
 				if ch != newPotentialCh {
 					chNode := g.Nodes[newPotentialCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
@@ -355,8 +395,11 @@ mergeLoop:
 					}
 				}
 				delete(g.clusters, currCh.Id)
+				g.orderClusters()
+
 			}
 		}
+
 	}
 	g.formClusters()
 	g.Log(fmt.Sprintf("%v\n", g.clusters))

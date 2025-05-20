@@ -1,6 +1,7 @@
 package node
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log"
@@ -28,7 +29,6 @@ const (
 	InputSize            = 4
 	Epochs               = 10
 	BatchSize            = 1
-	d                    = 2
 	ParsevalValuesToSend = 10
 	LearningRate         = 0.1
 	SendWeightsPeriod    = 1
@@ -57,6 +57,7 @@ type Node struct {
 	finishChan        chan struct{}
 	internalChans     map[int]chan any
 	f                 *os.File
+	d                 int
 	round             int
 	subscribers       map[int]struct{}
 	gru               neuralnetwork.NeuralNetwork
@@ -76,7 +77,6 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
 		panic(err)
 	}
-
 	return &Node{
 		Id:       id,
 		Velocity: velocity,
@@ -104,6 +104,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		weightMessages:    make(map[int]*messages.WeightsMessage),
 		mtx:               &sync.Mutex{},
 		sendWeightsPeriod: 1,
+		d:                 d,
 	}
 }
 
@@ -125,14 +126,14 @@ func (n *Node) UpdateNode(posx, posy, velocity, angle float64) {
 
 func (n *Node) ResetNode() {
 	n.round = 1
-	n.PCH = make([]*Node, len(n.PCH))
-	n.CNN = make([]*Node, len(n.CNN))
+	n.PCH = make([]*Node, n.d+1)
+	n.CNN = make([]*Node, n.d+1)
 	n.DHopNeighbors = make(map[int]*Node)
 	n.subscribers = make(map[int]struct{})
 }
 
 func (n *Node) SendWeights() {
-	n.sendMsg(messages.NewMessage(n.Id, n.PCH[d].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: n.gru.GetWeights()}))
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[n.d].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: n.gru.GetWeights()}))
 }
 func PrintPath(path []*Node) string {
 	s := ""
@@ -218,7 +219,7 @@ func (n *Node) handleClusterHeadsWeightExchange(averageWeights [][][]float64, cl
 	// send average weights to all cluster heads
 	for clusterId := range clusters {
 		// don't send to itself
-		if clusterId == n.PCH[d].Id {
+		if clusterId == n.PCH[n.d].Id {
 			continue
 		}
 		n.sendMsg(messages.NewMessage(n.Id, clusterId, messages.DefaultTTL, &messages.ClusterWeightsMessage{
@@ -272,7 +273,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 	// reset period
 	n.sendWeightsPeriod = 1
 
-	myCluster := clusters[n.PCH[d].Id]
+	myCluster := clusters[n.PCH[n.d].Id]
 	clusterSize := len(myCluster)
 
 	if n.IsCH() {
@@ -312,7 +313,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
 			panic(err)
 		}
-		n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.PCH[d].Id, weightsMessage.SenderId))
+		n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.PCH[n.d].Id, weightsMessage.SenderId))
 	case <-timer.C:
 		fmt.Printf("[%d]: Did not receive weights\n", n.Id)
 		n.printPCH()
@@ -330,16 +331,16 @@ func (n *Node) SendParsevalValues() {
 		parsevalValues[i] = parsevalValue
 	}
 
-	n.sendMsg(messages.NewMessage(n.Id, n.PCH[d].Id, messages.DefaultTTL, &messages.ParsevalMessage{
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[n.d].Id, messages.DefaultTTL, &messages.ParsevalMessage{
 		SenderId:       n.Id,
 		ParsevalValues: parsevalValues,
 	}))
 
 }
 func (n *Node) printPCH() {
-	fmt.Printf("[%d]: PCH: %d\n", n.Id, n.PCH[d].Id)
+	fmt.Printf("[%d]: PCH: %d\n", n.Id, n.PCH[n.d].Id)
 	fmt.Printf("[%d]: ", n.Id)
-	for i := range d {
+	for i := range n.d {
 		fmt.Printf("%d ", n.PCH[i].Id)
 	}
 	fmt.Println()
@@ -354,10 +355,10 @@ func (n *Node) Degree() int {
 	return len(n.DHopNeighbors)
 }
 func (n *Node) IsCH() bool {
-	if n.PCH[d] == nil {
+	if n.PCH[n.d] == nil {
 		panic(fmt.Sprintf("[%d]: %+v\n", n.Id, n.PCH))
 	}
-	return n.PCH[d].Id == n.Id
+	return n.PCH[n.d].Id == n.Id
 }
 
 func (n *Node) GetdHopNeighs(d int) map[int]*Node {
@@ -365,7 +366,7 @@ func (n *Node) GetdHopNeighs(d int) map[int]*Node {
 	q := make([]*Node, 1)
 	q[0] = n
 	visited[n.Id] = struct{}{}
-	for i := 0; i < d; i++ {
+	for i := 0; i < n.d; i++ {
 		for _, cn := range q {
 			q = q[1:]
 			for _, nn := range cn.DHopNeighbors {
@@ -440,7 +441,7 @@ func (n *Node) advertiseCNN() {
 			}
 			msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.CNNMessage{
 				SenderId: n.Id,
-				Round:    round + 1,
+				Round:    round,
 				CNN:      n.CNN[round],
 			})
 			n.sendMsg(msg)
@@ -449,13 +450,13 @@ func (n *Node) advertiseCNN() {
 }
 
 func (n *Node) advertiseCluster() {
-	if n.PCH[d] == nil {
+	if n.PCH[n.d] == nil {
 		return
 	}
 	for subId := range n.DHopNeighbors {
 		msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.ClusterMessage{
 			Sender:    n.Id,
-			ClusterId: n.PCH[d].Id,
+			ClusterId: n.PCH[n.d].Id,
 			IsCh:      n.IsCH(),
 		})
 		n.sendMsg(msg)
@@ -580,7 +581,7 @@ func (n *Node) RelativeMax(d int) {
 
 	if len(n.DHopNeighbors) == 0 {
 		// node has no neighbors
-		for i := 1; i <= d; i++ {
+		for i := 1; i <= n.d; i++ {
 			n.CNN[i] = n
 			n.PCH[i] = n
 		}
@@ -615,11 +616,12 @@ func (n *Node) RelativeMax(d int) {
 	} else {
 		n.PCH[1] = n.PCH[0]
 
-		for n.round = 2; n.round <= d; n.round++ {
+		for n.round = 2; n.round <= n.d; n.round++ {
 			n.PCH[n.round] = n
 			n.CNN[n.round] = n
-			n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
 		}
+		n.round = n.d
+		n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d, round: %d\n", n.PCH[n.d].Id, n.round))
 		return
 	}
 
@@ -630,7 +632,7 @@ func (n *Node) RelativeMax(d int) {
 	n.sendMsg(subMsg)
 
 	// for the rest of the rounds the CNN is selected based on what the previous CNN has selected
-	for n.round = 2; n.round <= d; {
+	for n.round = 2; n.round <= n.d; {
 		timer := time.NewTimer(500 * time.Millisecond)
 		n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 		var newMsg any
@@ -645,7 +647,7 @@ func (n *Node) RelativeMax(d int) {
 		}
 
 		cnnMessage, ok := newMsg.(*messages.CNNMessage)
-		if !ok || cnnMessage.Round != n.round || cnnMessage.SenderId != n.PCH[n.round-1].Id {
+		if !ok || cnnMessage.Round != n.round || cnnMessage.SenderId != n.PCH[1].Id {
 			continue
 		}
 		cnn, ok := cnnMessage.CNN.(*Node)
@@ -661,7 +663,7 @@ func (n *Node) RelativeMax(d int) {
 		n.f.WriteString(fmt.Sprintf("[%d]: Round %d: CNN: %d, PCH: %d\n", n.Id, n.round, n.CNN[n.round].Id, n.PCH[n.round].Id))
 		n.round++
 	}
-	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
+	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[n.d].Id))
 }
 func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, pci int) float64 {
 	dx := math.Pow(n.PosX-x, 2)
@@ -694,7 +696,8 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 		}
 		visited[cState.node.Id] = struct{}{}
 		q = q[1:]
-		for _, n := range cState.node.DHopNeighbors {
+		orderedNeighbors := cState.node.getOrderedNeighbors()
+		for _, n := range orderedNeighbors {
 			if _, ok := visited[n.Id]; ok {
 				continue
 			}
@@ -710,7 +713,19 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 	}
 	return []*Node{}
 }
+func (n *Node) getOrderedNeighbors() []*Node {
+	orderedNeighbors := make([]*Node, 0, len(n.DHopNeighbors))
 
+	for _, neighbor := range n.DHopNeighbors {
+		orderedNeighbors = append(orderedNeighbors, neighbor)
+	}
+
+	slices.SortFunc(orderedNeighbors, func(a, b *Node) int {
+		return cmp.Compare(a.Id, b.Id)
+	})
+
+	return orderedNeighbors
+}
 func (n *Node) PCI() int {
 	pciTable := make([]int, len(n.DHopNeighbors))
 	idx := 0
