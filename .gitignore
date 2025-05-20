@@ -10,3 +10,6 @@ pythonNeural/
 pythonNetworkServer/
 generatePlots.py
 plots/
+xprmnts/
+generateXplots.py
+generateDataDistributions.py

@@ -109,9 +109,9 @@ func shuffleData(X, Y [][][]float64) {
 	if len(X) != len(Y) {
 		panic("X and Y must have the same number of samples")
 	}
-
+	r := rand.New(rand.NewSource(10))
 	// Shuffle in place.
-	rand.Shuffle(len(X), func(i, j int) {
+	r.Shuffle(len(X), func(i, j int) {
 		X[i], X[j] = X[j], X[i]
 		Y[i], Y[j] = Y[j], Y[i]
 	})
@@ -410,7 +410,7 @@ func (g *GRU) ParseFile(filename string) error {
 		Y = append(Y, t2)
 	}
 
-	shuffleData(X, Y)
+	// shuffleData(X, Y)
 
 	g.X = g.Sx.FitTransform(X)
 	g.Y = g.Sy.FitTransform(Y)

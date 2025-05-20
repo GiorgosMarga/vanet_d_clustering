@@ -24,12 +24,14 @@ const (
 	b                    = 0.9
 	c                    = 1
 	TrainSizePercentage  = 0.8
-	HiddenStateSize      = 16
+	HiddenStateSize      = 4
 	InputSize            = 4
-	Epochs               = 50
-	BatchSize            = 5
+	Epochs               = 10
+	BatchSize            = 1
 	d                    = 2
 	ParsevalValuesToSend = 10
+	LearningRate         = 0.1
+	SendWeightsPeriod    = 1
 )
 
 const (
@@ -43,23 +45,24 @@ const (
 )
 
 type Node struct {
-	Id             int
-	DHopNeighbors  map[int]*Node
-	Velocity       float64
-	PosX           float64
-	PosY           float64
-	Angle          float64
-	CNN            []*Node
-	PCH            []*Node
-	msgChan        chan *messages.Message
-	finishChan     chan struct{}
-	internalChans  map[int]chan any
-	f              *os.File
-	round          int
-	subscribers    map[int]struct{}
-	gru            neuralnetwork.NeuralNetwork
-	weightMessages map[int]*messages.WeightsMessage
-	mtx            *sync.Mutex
+	Id                int
+	DHopNeighbors     map[int]*Node
+	Velocity          float64
+	PosX              float64
+	PosY              float64
+	Angle             float64
+	CNN               []*Node
+	PCH               []*Node
+	msgChan           chan *messages.Message
+	finishChan        chan struct{}
+	internalChans     map[int]chan any
+	f                 *os.File
+	round             int
+	subscribers       map[int]struct{}
+	gru               neuralnetwork.NeuralNetwork
+	weightMessages    map[int]*messages.WeightsMessage
+	mtx               *sync.Mutex
+	sendWeightsPeriod int
 }
 
 func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *Node {
@@ -68,7 +71,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		log.Fatal(err)
 	}
 
-	nn := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, 0.001, 0.7)
+	nn := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, LearningRate, TrainSizePercentage)
 
 	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
 		panic(err)
@@ -92,14 +95,15 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 			ClusterWeightsService: make(chan any),
 			ParsevalService:       make(chan any),
 		},
-		round:          1,
-		finishChan:     make(chan struct{}),
-		f:              f,
-		DHopNeighbors:  make(map[int]*Node),
-		subscribers:    make(map[int]struct{}),
-		gru:            nn,
-		weightMessages: make(map[int]*messages.WeightsMessage),
-		mtx:            &sync.Mutex{},
+		round:             1,
+		finishChan:        make(chan struct{}),
+		f:                 f,
+		DHopNeighbors:     make(map[int]*Node),
+		subscribers:       make(map[int]struct{}),
+		gru:               nn,
+		weightMessages:    make(map[int]*messages.WeightsMessage),
+		mtx:               &sync.Mutex{},
+		sendWeightsPeriod: 1,
 	}
 }
 
@@ -236,7 +240,7 @@ func (n *Node) handleClusterHeadsWeightExchange(averageWeights [][][]float64, cl
 
 	// receive average weights from all other cluster heads
 clustersLoop:
-	for range len(clusters)-1 {
+	for range len(clusters) - 1 {
 		select {
 		case msg := <-n.internalChans[ClusterWeightsService]:
 			weightMessage, ok := msg.(*messages.ClusterWeightsMessage)
@@ -258,6 +262,16 @@ clustersLoop:
 
 // TODO: change cluster size and fix function (no if/else) split ?
 func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
+
+	if n.sendWeightsPeriod < SendWeightsPeriod {
+		n.f.WriteString("Skipping this round\n")
+		n.sendWeightsPeriod++
+		return
+	}
+
+	// reset period
+	n.sendWeightsPeriod = 1
+
 	myCluster := clusters[n.PCH[d].Id]
 	clusterSize := len(myCluster)
 
@@ -298,7 +312,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
 			panic(err)
 		}
-		n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.Id, weightsMessage.SenderId))
+		n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.PCH[d].Id, weightsMessage.SenderId))
 	case <-timer.C:
 		fmt.Printf("[%d]: Did not receive weights\n", n.Id)
 		n.printPCH()
@@ -626,7 +640,8 @@ func (n *Node) RelativeMax(d int) {
 				<-timer.C
 			}
 		case <-timer.C:
-			panic(fmt.Sprintf("[%d]: Error here\n", n.Id))
+			fmt.Printf("[%d]: Error here\n", n.Id)
+			continue
 		}
 
 		cnnMessage, ok := newMsg.(*messages.CNNMessage)
