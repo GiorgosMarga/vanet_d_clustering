@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/cmplx"
-	"math/rand/v2"
+	"math/rand"
 )
 
 func getDims(matrix [][]float64) (int, int) {
@@ -135,11 +135,12 @@ func MatrixOuterProduct(a, b [][]float64) [][]float64 {
 	return result
 }
 func RandomMatrix(rows, cols int, scale float64) [][]float64 {
+	r := rand.New(rand.NewSource(10))
 	matrix := make([][]float64, rows)
 	for i := range matrix {
 		matrix[i] = make([]float64, cols)
 		for j := range matrix[i] {
-			matrix[i][j] = (rand.Float64()*2 - 1) * scale // Range: [-scale, scale]
+			matrix[i][j] = (r.Float64()*2 - 1) * scale // Range: [-scale, scale]
 		}
 	}
 	return matrix

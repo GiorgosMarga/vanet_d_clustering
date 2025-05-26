@@ -12,11 +12,13 @@ import (
 
 type LossFunction func(yActual [][]float64, yPred [][]float64) float64
 
-func MeanSquareError(yActual, yPred [][]float64) float64 {
+func (g *GRU) MeanSquareError(yActual, yPred [][]float64) float64 {
 	sum := 0.0
 	n := len(yActual)
 	for row := range n {
-		diff := yActual[row][0] - yPred[row][0]
+		yA := [][][]float64{{{yActual[row][0]}}}
+		yP := [][][]float64{{{yPred[row][0]}}}
+		diff := g.Sy.InverseTransform(yA)[0][0][0] - g.Sy.InverseTransform(yP)[0][0][0]
 		sum += diff * diff
 	}
 	return sum / float64(n)
@@ -78,18 +80,17 @@ type GRU struct {
 	trainingSize float64
 }
 
-func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, learningRate, trainingSize float64) *GRU {
+func NewGRU(hiddenSize, inputSize, patience int, learningRate, trainingSize float64) *GRU {
 	scale := 1.0 / float64(hiddenSize) // Xavier-like scaling
 	updateGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	resetGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
-	return &GRU{
+	g := &GRU{
 		UpdateGate:   updateGate,
 		ResetGate:    resetGate,
 		Whx:          matrix.RandomMatrix(hiddenSize, inputSize, scale),
 		Whh:          matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
 		bh:           matrix.RandomMatrix(hiddenSize, 1, scale),
 		finalH:       matrix.RandomMatrix(hiddenSize, 1, 0),
-		lossFunction: lossFunction,
 		hiddenSize:   hiddenSize,
 		dWhiddenX:    matrix.RandomMatrix(hiddenSize, inputSize, scale),
 		dWhiddenH:    matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
@@ -97,12 +98,14 @@ func NewGRU(hiddenSize, inputSize, patience int, lossFunction LossFunction, lear
 		wOut:         matrix.RandomMatrix(1, hiddenSize, scale),
 		bOut:         matrix.RandomMatrix(1, 1, scale),
 		learningRate: learningRate,
-		earlyStop:    NewEarlyStop(patience, 0.001),
+		earlyStop:    NewEarlyStop(patience, 0.0001),
 		Errors:       make([]float64, 0),
 		Sx:           NewScaler(),
 		Sy:           NewScaler(),
 		trainingSize: trainingSize,
 	}
+	g.lossFunction = g.MeanSquareError
+	return g
 }
 
 func shuffleData(X, Y [][][]float64) {
@@ -283,13 +286,14 @@ func (g *GRU) Train(epochs, batchSize int) error {
 			totalLoss += batchLoss
 		}
 		averageLoss := totalLoss / float64(len(inputs)/batchSize)
-		if g.earlyStop.CheckEarlyStop(averageLoss) {
-			// fmt.Printf("Early stopping at epoch %d\n", epoch)
+		if g.earlyStop != nil && g.earlyStop.CheckEarlyStop(averageLoss) {
+			// fmt.Printf("Early stop at epoch: %d\n", epoch)
 			break
 		}
 		// fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, averageLoss)
 		g.Errors = append(g.Errors, averageLoss)
 	}
+	g.earlyStop.Reset()
 
 	return nil
 }
@@ -414,6 +418,8 @@ func (g *GRU) ParseFile(filename string) error {
 
 	g.X = g.Sx.FitTransform(X)
 	g.Y = g.Sy.FitTransform(Y)
+	// g.X = X
+	// g.Y = Y
 
 	return nil
 
@@ -434,6 +440,8 @@ func (g *GRU) Evaluate() ([]float64, []float64, error) {
 		}
 		predictions = append(predictions, g.Sx.InverseTransform([][][]float64{output})[0][0][0])
 		expected = append(expected, g.Sy.InverseTransform([][][]float64{Y[i]})[0][0][0])
+		// predictions = append(predictions, output[0][0])
+		// expected = append(expected, Y[i][0][0])
 	}
 	return predictions, expected, nil
 

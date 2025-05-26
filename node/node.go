@@ -25,10 +25,11 @@ const (
 	b                    = 0.9
 	c                    = 1
 	TrainSizePercentage  = 0.8
-	HiddenStateSize      = 4
+	HiddenStateSize      = 16
 	InputSize            = 4
-	Epochs               = 10
+	Epochs               = 50
 	BatchSize            = 1
+	Patience             = 20
 	ParsevalValuesToSend = 10
 	LearningRate         = 0.1
 	SendWeightsPeriod    = 1
@@ -72,9 +73,11 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		log.Fatal(err)
 	}
 
-	nn := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, LearningRate, TrainSizePercentage)
+	nn := gru.NewGRU(HiddenStateSize, InputSize, Patience, LearningRate, TrainSizePercentage)
+	// file := rand.Intn(600) % 60
+	file := id % 60
 
-	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
+	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", file))); err != nil {
 		panic(err)
 	}
 	return &Node{
@@ -642,7 +645,6 @@ func (n *Node) RelativeMax(d int) {
 				<-timer.C
 			}
 		case <-timer.C:
-			fmt.Printf("[%d]: Error here\n", n.Id)
 			continue
 		}
 
