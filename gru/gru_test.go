@@ -68,7 +68,8 @@ func TestTrain(t *testing.T) {
 	}
 
 	shuffleData(X, Y)
-	g := NewGRU(16, 4, 10, MeanSquareError, 0.005, 0.8)
+	g := NewGRU(16, 4, 10, 0.005, 0.8)
+	g.lossFunction = g.MeanSquareError
 	g.X = g.Sx.FitTransform(X)
 	g.Y = g.Sy.FitTransform(Y)
 	if err := g.Train(500, 20); err != nil {

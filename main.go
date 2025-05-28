@@ -68,7 +68,7 @@ func main() {
 
 	for _, node := range g.Nodes {
 		if node.IsCH() {
-			fmt.Printf("Node [%d] predict\n", node.Id)
+			fmt.Printf("Node [%d] (cluster head for %d rounds) predict\n", node.Id, node.ClusterHeadRounds)
 			// node.Train()
 			node.Predict()
 		}

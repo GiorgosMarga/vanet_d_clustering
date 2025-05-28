@@ -232,6 +232,12 @@ func FFT(x []float64) []complex128 {
 		res[i] = complex(x[i], 0)
 	}
 	fftRec(res, N)
+
+	// normalize values
+	sqrtN := math.Sqrt(float64(N))
+	for i := range res {
+		res[i] /= complex(sqrtN, 0)
+	}
 	return res
 }
 
@@ -281,7 +287,7 @@ func Parseval(arr []complex128) []float64 {
 	res := make([]float64, len(arr))
 
 	for i, c := range arr {
-		res[i] = cmplx.Abs(c)
+		res[i] = math.Pow(cmplx.Abs(c), 2)
 	}
 	return res
 }
@@ -295,6 +301,5 @@ func CalculateMatDistance(arr1, arr2 []float64) float64 {
 	for i := range arr1 {
 		res += math.Abs(arr1[i] - arr2[i])
 	}
-
 	return res
 }
