@@ -7,9 +7,9 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
 # Parameters
-hidden_size = 16  # GRU hidden state size
+hidden_size = 4  # GRU hidden state size
 output_size = 1   # Output dimension
-batch_size = 32   # Number of sequences in a batch
+batch_size = 4   # Number of sequences in a batch
 train_size = 0.8
 
 class GRU():
@@ -56,7 +56,7 @@ class GRU():
             model_weights.append(model_weight)
         self.model.set_weights(model_weights)
 
-    def train(self,epochs=50,batch_size=10):
+    def train(self,epochs=10,batch_size=10):
         print(f"{self.id}: Train")
 
         self.model.compile(optimizer='adam', loss='mse')
@@ -74,7 +74,6 @@ class GRU():
 
     def evaluate(self):
         print(f"{self.id}: Evaluate")
-
         result = self.model.evaluate(self.x_test, self.y_test)
         return result
 

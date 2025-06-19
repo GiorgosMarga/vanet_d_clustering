@@ -8,4 +8,5 @@ type NeuralNetwork interface {
 	Evaluate() ([]float64, []float64, error)
 	ParseFile(string) error
 	GetErrors() []float64
+	GetParsevalValues(numOfParsevalValues int) []float64
 }

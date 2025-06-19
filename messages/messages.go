@@ -69,6 +69,6 @@ type ClusterWeightsMessage struct {
 
 type ParsevalMessage struct {
 	SenderId       int
-	ParsevalValues [][]float64
+	ParsevalValues []float64
 	Velocity       float64
 }

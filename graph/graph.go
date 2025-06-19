@@ -104,9 +104,9 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 			n = g.PoolOfNodes[nodeId]
 		}
 		if n == nil {
-
 			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", nodeId)))
 			g.AddNode(n)
+			g.PoolOfNodes[n.Id] = n
 			continue
 		}
 		n.UpdateNode(t[1], t[2], t[3], t[4])
@@ -139,6 +139,7 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		if len(n.DHopNeighbors) == 0 {
 			// this node doesnt exist in the snapshot and should be removed
 			delete(g.Nodes, n.Id)
+			g.NumOfNodes--
 		}
 	}
 	return nil

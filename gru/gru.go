@@ -2,12 +2,14 @@ package gru
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/matrix"
+	neuralnetwork "github.com/GiorgosMarga/vanet_d_clustering/neuralNetwork"
 )
 
 type LossFunction func(yActual [][]float64, yPred [][]float64) float64
@@ -77,37 +79,43 @@ type GRU struct {
 	Sx *Scaler
 	Sy *Scaler
 
-	trainingSize float64
+	trainingSize      float64
+	inputSize         int
+	lossThreshold     float64
+	prevLoss          float64
+	convergenceRounds int
 }
 
-func NewGRU(hiddenSize, inputSize, patience int, learningRate, trainingSize float64) *GRU {
+func NewGRU(hiddenSize, inputSize, patience int, learningRate, trainingSize, lossThreshold float64) neuralnetwork.NeuralNetwork {
 	scale := 1.0 / float64(hiddenSize) // Xavier-like scaling
 	updateGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	resetGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	g := &GRU{
-		UpdateGate:   updateGate,
-		ResetGate:    resetGate,
-		Whx:          matrix.RandomMatrix(hiddenSize, inputSize, scale),
-		Whh:          matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
-		bh:           matrix.RandomMatrix(hiddenSize, 1, scale),
-		finalH:       matrix.RandomMatrix(hiddenSize, 1, 0),
-		hiddenSize:   hiddenSize,
-		dWhiddenX:    matrix.RandomMatrix(hiddenSize, inputSize, scale),
-		dWhiddenH:    matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
-		dbhidden:     matrix.RandomMatrix(hiddenSize, 1, scale),
-		wOut:         matrix.RandomMatrix(1, hiddenSize, scale),
-		bOut:         matrix.RandomMatrix(1, 1, scale),
-		learningRate: learningRate,
-		earlyStop:    NewEarlyStop(patience, 0.0001),
-		Errors:       make([]float64, 0),
-		Sx:           NewScaler(),
-		Sy:           NewScaler(),
-		trainingSize: trainingSize,
+		UpdateGate:    updateGate,
+		ResetGate:     resetGate,
+		Whx:           matrix.RandomMatrix(hiddenSize, inputSize, scale),
+		Whh:           matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
+		bh:            matrix.RandomMatrix(hiddenSize, 1, scale),
+		finalH:        matrix.RandomMatrix(hiddenSize, 1, 0),
+		hiddenSize:    hiddenSize,
+		dWhiddenX:     matrix.RandomMatrix(hiddenSize, inputSize, scale),
+		dWhiddenH:     matrix.RandomMatrix(hiddenSize, hiddenSize, scale),
+		dbhidden:      matrix.RandomMatrix(hiddenSize, 1, scale),
+		wOut:          matrix.RandomMatrix(1, hiddenSize, scale),
+		bOut:          matrix.RandomMatrix(1, 1, scale),
+		learningRate:  learningRate,
+		earlyStop:     NewEarlyStop(patience, 0.001),
+		Errors:        make([]float64, 0),
+		Sx:            NewScaler(),
+		Sy:            NewScaler(),
+		trainingSize:  trainingSize,
+		inputSize:     inputSize,
+		lossThreshold: lossThreshold,
+		prevLoss:      math.MaxFloat64,
 	}
 	g.lossFunction = g.MeanSquareError
 	return g
 }
-
 func shuffleData(X, Y [][][]float64) {
 	if len(X) != len(Y) {
 		panic("X and Y must have the same number of samples")
@@ -118,6 +126,14 @@ func shuffleData(X, Y [][][]float64) {
 		X[i], X[j] = X[j], X[i]
 		Y[i], Y[j] = Y[j], Y[i]
 	})
+}
+func (g *GRU) GetParsevalValues(numOfParsevalValues int) []float64 {
+	flattenX := make([]float64, 0)
+	for _, mat := range g.X {
+		flattenX = append(flattenX, matrix.Flatten(mat)...)
+	}
+
+	return matrix.Parseval(matrix.FFT(flattenX))[:numOfParsevalValues]
 }
 
 func (g *GRU) calculateCandidateHiddenState() [][]float64 {
@@ -137,7 +153,7 @@ func (g *GRU) calculateCandidateHiddenState() [][]float64 {
 func (g *GRU) Predict(X [][]float64) ([][]float64, error) {
 	var err error
 	g.Input = X
-	g.output, err = g.forwardPass()
+	g.output, err = g.forwardPass(0)
 	return g.output, err
 }
 
@@ -148,7 +164,7 @@ func (g *GRU) calculateFinalHiddenState() [][]float64 {
 	return matrix.MatrixAdd(a, matrix.ElementMatrixMul(b, g.candidateH))
 }
 
-func (g *GRU) forwardPass() ([][]float64, error) {
+func (g *GRU) forwardPass(dropoutRate float64) ([][]float64, error) {
 	g.prevH = g.finalH
 	var err error
 
@@ -163,7 +179,7 @@ func (g *GRU) forwardPass() ([][]float64, error) {
 	}
 
 	g.candidateH = g.calculateCandidateHiddenState()
-	g.finalH = g.calculateFinalHiddenState()
+	g.finalH = dropoutInput(g.calculateFinalHiddenState(), dropoutRate)
 	g.output = matrix.MatrixAdd(matrix.MatrixMul(g.wOut, g.finalH), g.bOut)
 	return g.output, nil
 }
@@ -270,7 +286,7 @@ func (g *GRU) Train(epochs, batchSize int) error {
 			for t := range batchX {
 				// Forward pass
 				g.Input = batchX[t]
-				predicted, err := g.forwardPass()
+				predicted, err := g.forwardPass(0.2)
 				if err != nil {
 					return err
 				}
@@ -286,12 +302,19 @@ func (g *GRU) Train(epochs, batchSize int) error {
 			totalLoss += batchLoss
 		}
 		averageLoss := totalLoss / float64(len(inputs)/batchSize)
+		g.Errors = append(g.Errors, averageLoss)
+
+		if averageLoss < g.lossThreshold || math.Abs(g.prevLoss-averageLoss) < 1e-6 {
+			g.convergenceRounds = epoch + 1
+			fmt.Printf("Converged at epoch: %d\n", g.convergenceRounds)
+			break
+		}
+		g.prevLoss = averageLoss
 		if g.earlyStop != nil && g.earlyStop.CheckEarlyStop(averageLoss) {
 			// fmt.Printf("Early stop at epoch: %d\n", epoch)
 			break
 		}
 		// fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, averageLoss)
-		g.Errors = append(g.Errors, averageLoss)
 	}
 	g.earlyStop.Reset()
 
@@ -393,11 +416,11 @@ func (g *GRU) ParseFile(filename string) error {
 	var X [][][]float64
 	var Y [][][]float64
 	for line := range len(lines) {
-		if line+5 > len(lines) {
+		if line+g.inputSize >= len(lines) {
 			break
 		}
-		t := make([][]float64, 4)
-		for i := range 4 {
+		t := make([][]float64, g.inputSize)
+		for i := range g.inputSize {
 			n, err := strconv.ParseFloat(lines[line+i], 64)
 			if err != nil {
 				panic(err)
@@ -405,7 +428,7 @@ func (g *GRU) ParseFile(filename string) error {
 			t[i] = []float64{n}
 		}
 		X = append(X, t)
-		n, err := strconv.ParseFloat(lines[line+4], 64)
+		n, err := strconv.ParseFloat(lines[line+g.inputSize], 64)
 		if err != nil {
 			panic(err)
 		}

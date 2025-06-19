@@ -3,11 +3,13 @@ package pythonneural
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/GiorgosMarga/vanet_d_clustering/matrix"
+	neuralnetwork "github.com/GiorgosMarga/vanet_d_clustering/neuralNetwork"
 )
 
 const (
@@ -17,6 +19,7 @@ const (
 	Evaluate
 	Predict
 	SendData
+	GetErrors
 )
 
 type ServerMessage struct {
@@ -29,10 +32,12 @@ type GetWeightsResponseMessage struct {
 }
 
 type PythonNeural struct {
-	conn net.Conn
+	conn           net.Conn
+	parsevalValues []float64
+	id             int
 }
 
-func NewPythonNeural(address string) (*PythonNeural, error) {
+func NewPythonNeural(address string, id int) (neuralnetwork.NeuralNetwork, error) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return nil, err
@@ -42,17 +47,23 @@ func NewPythonNeural(address string) (*PythonNeural, error) {
 
 	return &PythonNeural{
 		conn: conn,
+		id:   id,
 	}, nil
 
 }
 
 func (pn *PythonNeural) SendData(X, Y [][][]float64, id int) error {
+	x := make([][]float64, 0)
+	for _, m := range X {
+		x = append(x, m...)
+	}
+	pn.parsevalValues = matrix.Parseval(matrix.FFT(matrix.Flatten(x)))
 	dataMsg := ServerMessage{
 		Type: SendData,
 		Msg: map[string]any{
 			"X":  X,
 			"Y":  Y,
-			"id": id,
+			"id": pn.id,
 		},
 	}
 
@@ -124,20 +135,20 @@ func (pn *PythonNeural) GetWeights() [][][]float64 {
 	return response.Weights
 }
 
-func (pn *PythonNeural) Evaluate() error {
+func (pn *PythonNeural) Evaluate() ([]float64, []float64, error) {
 	// send evaluate message
 	newMsg := ServerMessage{
 		Type: Evaluate,
 	}
 	err := json.NewEncoder(pn.conn).Encode(newMsg)
 
-	return err
+	return []float64{}, []float64{}, err
 }
 
-func (pn *PythonNeural) ParseFile(filename string) ([][][]float64, [][][]float64, error) {
+func (pn *PythonNeural) ParseFile(filename string) error {
 	f, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	lines := strings.Split(string(f[:len(f)-1]), "\n")
@@ -165,23 +176,26 @@ func (pn *PythonNeural) ParseFile(filename string) ([][][]float64, [][][]float64
 		Y = append(Y, t2)
 	}
 
-	shuffleData(X, Y)
+	pn.SendData(X, Y, 10)
 
-	// g.X = g.Sx.FitTransform(X)
-	// g.Y = g.Sy.FitTransform(Y)
-
-	return X, Y, nil
-
+	return nil
 }
 
-func shuffleData(X, Y [][][]float64) {
-	if len(X) != len(Y) {
-		panic("X and Y must have the same number of samples")
-	}
-
-	// Shuffle in place.
-	rand.Shuffle(len(X), func(i, j int) {
-		X[i], X[j] = X[j], X[i]
-		Y[i], Y[j] = Y[j], Y[i]
-	})
+func (pn *PythonNeural) GetErrors() []float64 {
+	return []float64{}
 }
+func (pn *PythonNeural) GetParsevalValues(numOfParsevalValues int) []float64 {
+	return pn.parsevalValues
+}
+
+// func shuffleData(X, Y [][][]float64) {
+// 	if len(X) != len(Y) {
+// 		panic("X and Y must have the same number of samples")
+// 	}
+
+// 	// Shuffle in place.
+// 	rand.Shuffle(len(X), func(i, j int) {
+// 		X[i], X[j] = X[j], X[i]
+// 		Y[i], Y[j] = Y[j], Y[i]
+// 	})
+// }

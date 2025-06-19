@@ -6,12 +6,11 @@ import (
 )
 
 func TestNetwork(t *testing.T) {
-	n, err := NewPythonNeural(":5000")
+	n, err := NewPythonNeural(":5000", 10)
 	if err != nil {
 		fmt.Println(err)
 		t.FailNow()
 	}
-	
 
 	n.Train(10, 20)
 
@@ -20,7 +19,7 @@ func TestNetwork(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	n.Train(10,20)
+	n.Train(10, 20)
 	n.Evaluate()
 
 	n.Predict([][]float64{{1000.0}, {1001.0}, {1002.0}, {1003.0}})

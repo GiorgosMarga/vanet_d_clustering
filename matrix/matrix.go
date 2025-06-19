@@ -299,7 +299,22 @@ func CalculateMatDistance(arr1, arr2 []float64) float64 {
 		panic("Different length")
 	}
 	for i := range arr1 {
-		res += math.Abs(arr1[i] - arr2[i])
+		res += math.Pow(arr1[i]-arr2[i], 2)
+	}
+	return math.Sqrt(res)
+}
+
+func CalculateEuclDistance(arr1, arr2 []complex128) float64 {
+	res := 0.0
+
+	if len(arr1) != len(arr2) {
+		panic("Different length")
+	}
+	for i := range arr1 {
+		dx := math.Pow(real(arr1[i])-real(arr2[i]), 2)
+		dy := math.Pow(imag(arr1[i])-imag(arr2[i]), 2)
+		res += math.Sqrt(dx + dy)
+
 	}
 	return res
 }
