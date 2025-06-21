@@ -490,7 +490,7 @@ func (g *GRU) ParseFile(filename string) error {
 	g.X = g.Sx.FitTransform(X)
 	g.Y = g.Sy.FitTransform(Y)
 
-	shuffleData(g.X, g.Y)
+	// shuffleData(g.X, g.Y)
 	// g.X = X
 	// g.Y = Y
 
@@ -518,7 +518,7 @@ func (g *GRU) Evaluate() ([]float64, []float64, error) {
 		predictions = append(predictions, guess)
 		expected = append(expected, actual)
 		mse += math.Pow(guess-actual, 2)
-		if math.Abs(guess-actual) <= 0.5 {
+		if math.Abs(guess-actual)/math.Abs(actual) < 0.3 {
 			accuracy += 1
 		}
 	}

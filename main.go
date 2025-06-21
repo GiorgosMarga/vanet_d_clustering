@@ -49,11 +49,11 @@ func main() {
 	flag.Float64Var(&c, "c", 1.0, "c is the weight for degree")
 	flag.Float64Var(&trainSize, "ts", 0.8, "ts is the trainsize for the gru config.")
 
-	flag.IntVar(&hiddenSize, "hs", 16, "hs is the hidden size for gru config.")
+	flag.IntVar(&hiddenSize, "hs", 32, "hs is the hidden size for gru config.")
 
 	flag.IntVar(&inputSize, "is", 4, "is is the input size for gru config.")
 
-	flag.IntVar(&epochs, "e", 50, "e is the epochs for gru config.")
+	flag.IntVar(&epochs, "e", 20, "e is the epochs for gru config.")
 
 	flag.IntVar(&batchSize, "bs", 3, "bs is the batch size for gru config.")
 
@@ -124,10 +124,9 @@ func main() {
 		}
 		fmt.Printf("Filename: %s -> Connectivity: %d%% | Clusters: %d | AverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
 	}
-	for _, node := range g.Nodes {
-		if node.IsCH() {
+	for _, node := range g.PoolOfNodes {
+		if node.Id%2 == 0 && node.TotalRounds > 0 {
 			fmt.Printf("Node [%d] (cluster head for %d rounds, messages %.2f, total rounds: %d) predict\n", node.Id, node.ClusterHeadRounds, float64(node.MessagesSent)/float64(node.TotalRounds), node.TotalRounds)
-
 			// node.Train()
 			node.Predict()
 		}

@@ -71,6 +71,7 @@ func (g *Graph) ResetGraph() {
 		n.ResetNode()
 	}
 	g.links = 0
+	g.Nodes = make(map[int]*node.Node)
 }
 func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	g.ResetGraph()
@@ -87,6 +88,9 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	}
 
 	nodes, connections := string(splitted[0]), string(splitted[1])[:len(string(splitted[1]))-1]
+	if len(strings.Split(nodes, "\n")) != 60 {
+		fmt.Println(path, len(strings.Split(nodes, "\n")))
+	}
 	for _, n := range strings.Split(nodes, "\n") {
 		splitted := strings.Split(strings.TrimSpace(n), " ")
 		if len(splitted) != 5 {
@@ -141,13 +145,13 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		n1.AddNeighbor(n2)
 	}
 
-	for _, n := range g.Nodes {
-		if len(n.DHopNeighbors) == 0 {
-			// this node doesnt exist in the snapshot and should be removed
-			delete(g.Nodes, n.Id)
-			g.NumOfNodes--
-		}
-	}
+	// for _, n := range g.Nodes {
+	// 	if len(n.DHopNeighbors) == 0 {
+	// 		// this node doesnt exist in the snapshot and should be removed
+	// 		delete(g.Nodes, n.Id)
+	// 		g.NumOfNodes--
+	// 	}
+	// }
 	return nil
 }
 

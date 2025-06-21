@@ -22,7 +22,6 @@ import (
 	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
-
 type AlgoConfig struct {
 	A                    float64
 	B                    float64
@@ -621,7 +620,7 @@ func (n *Node) RelativeMax(d int) {
 			n.CNN[i] = n
 			n.PCH[i] = n
 		}
-		panic("No neighbors")
+		return
 	}
 
 	defer func() {
