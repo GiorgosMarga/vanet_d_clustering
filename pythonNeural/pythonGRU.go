@@ -184,6 +184,9 @@ func (pn *PythonNeural) ParseFile(filename string) error {
 func (pn *PythonNeural) GetErrors() []float64 {
 	return []float64{}
 }
+func (pn *PythonNeural) GetAccuracies() []float64 {
+	return []float64{}
+}
 func (pn *PythonNeural) GetParsevalValues(numOfParsevalValues int) []float64 {
 	return pn.parsevalValues
 }

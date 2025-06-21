@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/GiorgosMarga/vanet_d_clustering/gru"
 	"github.com/GiorgosMarga/vanet_d_clustering/node"
 	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
@@ -35,9 +36,11 @@ type Graph struct {
 	f                *os.File
 	links            int
 	PoolOfNodes      map[int]*node.Node
+	algoConfig       *node.AlgoConfig
+	gruConfig        *gru.GRUConfig
 }
 
-func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
+func NewGraph(minClusterNumber, d, numOfNodes int, gruConfig *gru.GRUConfig, algoConfig *node.AlgoConfig) (*Graph, error) {
 	f, err := os.OpenFile(filepath.Join(utils.GetProjectRoot(), "graph_info", "graph.info"), os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
@@ -45,8 +48,8 @@ func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
 	pool := make(map[int]*node.Node)
 
 	for id := range numOfNodes {
-
-		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", id)))
+		filename := filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", id))
+		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, filename, gruConfig, algoConfig)
 	}
 	fmt.Printf("Initialized %d nodes\n", numOfNodes)
 	return &Graph{
@@ -58,6 +61,8 @@ func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
 		links:            0,
 		f:                f,
 		PoolOfNodes:      pool,
+		algoConfig:       algoConfig,
+		gruConfig:        gruConfig,
 	}, nil
 }
 func (g *Graph) ResetGraph() {
@@ -104,7 +109,8 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 			n = g.PoolOfNodes[nodeId]
 		}
 		if n == nil {
-			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", nodeId)))
+			filename := filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", nodeId))
+			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], filename, g.gruConfig, g.algoConfig)
 			g.AddNode(n)
 			g.PoolOfNodes[n.Id] = n
 			continue

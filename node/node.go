@@ -19,28 +19,19 @@ import (
 	"github.com/GiorgosMarga/vanet_d_clustering/matrix"
 	"github.com/GiorgosMarga/vanet_d_clustering/messages"
 	neuralnetwork "github.com/GiorgosMarga/vanet_d_clustering/neuralNetwork"
-	pythonneural "github.com/GiorgosMarga/vanet_d_clustering/pythonNeural"
 	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
-const (
-	a                    = 0.1
-	b                    = 0.9
-	c                    = 1
-	k                    = 2
-	TrainSizePercentage  = 0.7
-	HiddenStateSize      = 16
-	InputSize            = 5
-	Epochs               = 20
-	BatchSize            = 1
-	Patience             = 20
-	ParsevalValuesToSend = 5
-	LearningRate         = 0.01
-	SendWeightsPeriod    = 1
-	ParsevalError        = 0
-	PythonServer         = false
-	ServerAddress        = ":5000"
-)
+
+type AlgoConfig struct {
+	A                    float64
+	B                    float64
+	C                    float64
+	ParsevalValuesToSend int
+	SendWeightPeriod     int
+	RnpPercentage        float64 // Random Node Partitipation percentage, if it is set to 1, all nodes participate
+	ParsevalError        float64
+}
 
 const (
 	BeaconService = iota
@@ -75,19 +66,16 @@ type Node struct {
 	ClusterHeadRounds int
 	MessagesSent      int
 	TotalRounds       int
+	algoConfig        *AlgoConfig
 }
 
-func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *Node {
+func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gruConfig *gru.GRUConfig, algoConfig *AlgoConfig) *Node {
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
-	var nn neuralnetwork.NeuralNetwork
-	if PythonServer {
-		nn, _ = pythonneural.NewPythonNeural(ServerAddress, id)
-	} else {
-		nn = gru.NewGRU(HiddenStateSize, InputSize, Patience, LearningRate, TrainSizePercentage,0.001)
-	}
+	nn := gru.NewGRU(gruConfig)
+
 	// file := rand.Intn(61) % 60
 	file := id % 60
 
@@ -124,6 +112,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		d:                 d,
 		ClusterHeadRounds: 0,
 		MessagesSent:      0,
+		algoConfig:        algoConfig,
 	}
 }
 
@@ -174,13 +163,14 @@ func (n *Node) Predict() error {
 	}
 	n.f.WriteString(fmt.Sprintf("%+v\n", predicted))
 	n.f.WriteString(fmt.Sprintf("%+v\n", actual))
-	n.f.WriteString(fmt.Sprintf("%+v\n", n.gru.GetErrors()))
+	n.f.WriteString(fmt.Sprintf("Errors: %+v\n", n.gru.GetErrors()))
+	n.f.WriteString(fmt.Sprintf("Accuracies: %+v\n", n.gru.GetAccuracies()))
 	return nil
 }
 func (n *Node) Train() error {
 
 	n.f.WriteString(fmt.Sprintf("Training node %d\n", n.Id))
-	if err := n.gru.Train(Epochs, BatchSize); err != nil {
+	if err := n.gru.Train(); err != nil {
 		return err
 	}
 	n.f.WriteString(fmt.Sprintf("Finished training node %d\n", n.Id))
@@ -243,7 +233,7 @@ func (n *Node) handleMembersWeightExchange(clusterSize int) [][][]float64 {
 	defer timer.Stop()
 
 membersLoop:
-	for range clusterSize - 1 {
+	for range int(float64((clusterSize - 1)) * n.algoConfig.RnpPercentage) {
 		select {
 		case msg := <-n.internalChans[WeightsService]:
 			weightMessage, ok := msg.(*messages.WeightsMessage)
@@ -308,7 +298,7 @@ clustersLoop:
 
 func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
-	if n.sendWeightsPeriod < SendWeightsPeriod {
+	if n.sendWeightsPeriod < n.algoConfig.SendWeightPeriod {
 		n.f.WriteString("Skipping this round\n")
 		n.sendWeightsPeriod++
 		return
@@ -389,7 +379,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
 func (n *Node) SendParsevalValues() {
 
-	parsevalValues := n.gru.GetParsevalValues(ParsevalValuesToSend)
+	parsevalValues := n.gru.GetParsevalValues(n.algoConfig.ParsevalValuesToSend)
 
 	n.sendMsg(messages.NewMessage(n.Id, n.PCH[n.d].Id, messages.DefaultTTL, &messages.ParsevalMessage{
 		SenderId:       n.Id,
@@ -725,7 +715,7 @@ func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, ClusterHead
 	// Using degree
 	// return a*dxy + b*dvelocityX + c*(float64(n.Degree())-float64(degree))
 	// using degree + cluster head counter
-	return a*dxy + b*dvelocityX + c*(float64(n.Degree())-float64(degree))
+	return n.algoConfig.A*dxy + n.algoConfig.B*dvelocityX + n.algoConfig.C*(float64(n.Degree())-float64(degree))
 	// Using PCI
 	// return a*dxy + b*math.Abs(n.Velocity-vel) + c*(float64(n.PCI())-float64(n.PCI()))
 

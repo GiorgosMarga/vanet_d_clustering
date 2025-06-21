@@ -12,6 +12,17 @@ import (
 	neuralnetwork "github.com/GiorgosMarga/vanet_d_clustering/neuralNetwork"
 )
 
+type GRUConfig struct {
+	TrainSizePercentage float64
+	HiddenStateSize     int
+	InputSize           int
+	Epochs              int
+	BatchSize           int
+	Patience            int
+	LearningRate        float64
+	LossThreshold       float64
+}
+
 type LossFunction func(yActual [][]float64, yPred [][]float64) float64
 
 func (g *GRU) MeanSquareError(yActual, yPred [][]float64) float64 {
@@ -73,7 +84,8 @@ type GRU struct {
 	Y [][][]float64
 
 	// save errors in case of plotting
-	Errors []float64
+	Errors     []float64
+	Accuracies []float64
 
 	// scalers
 	Sx *Scaler
@@ -84,9 +96,42 @@ type GRU struct {
 	lossThreshold     float64
 	prevLoss          float64
 	convergenceRounds int
+	epochs            int
+	batchSize         int
 }
 
-func NewGRU(hiddenSize, inputSize, patience int, learningRate, trainingSize, lossThreshold float64) neuralnetwork.NeuralNetwork {
+func NewGRU(config *GRUConfig) neuralnetwork.NeuralNetwork {
+	hiddenSize := 16
+	trainingSize := 0.8
+	inputSize := 4
+	epochs := 50
+	batchSize := 3
+	patience := 20
+	learningRate := 0.05
+	lossThreshold := 0.001
+	if config.HiddenStateSize != 0 {
+		hiddenSize = config.HiddenStateSize
+	}
+	if config.TrainSizePercentage != 0.0 {
+		trainingSize = config.TrainSizePercentage
+	}
+	if config.InputSize != 0 {
+		inputSize = config.InputSize
+	}
+	if config.Epochs != 0 {
+		epochs = config.Epochs
+	}
+	if config.Patience != 0 {
+		patience = config.Patience
+	}
+
+	if config.Epochs != 0 {
+		epochs = config.Epochs
+	}
+	if config.BatchSize != 0 {
+		batchSize = config.BatchSize
+	}
+
 	scale := 1.0 / float64(hiddenSize) // Xavier-like scaling
 	updateGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
 	resetGate := NewGate(matrix.RandomMatrix(hiddenSize, 1, scale), matrix.RandomMatrix(hiddenSize, hiddenSize, scale), matrix.RandomMatrix(hiddenSize, inputSize, scale), sigmoid)
@@ -112,6 +157,9 @@ func NewGRU(hiddenSize, inputSize, patience int, learningRate, trainingSize, los
 		inputSize:     inputSize,
 		lossThreshold: lossThreshold,
 		prevLoss:      math.MaxFloat64,
+		Accuracies:    make([]float64, 0),
+		epochs:        epochs,
+		batchSize:     batchSize,
 	}
 	g.lossFunction = g.MeanSquareError
 	return g
@@ -267,18 +315,18 @@ func (g *GRU) initializeHiddenState(hiddenSize int) {
 	g.prevH = h
 }
 
-func (g *GRU) Train(epochs, batchSize int) error {
+func (g *GRU) Train() error {
 	trainSize := int(float64(len(g.X)) * g.trainingSize)
 	inputs := g.X[:trainSize]
 	targets := g.Y[:trainSize]
 	g.initializeHiddenState(g.hiddenSize)
-	for epoch := range epochs {
+	for epoch := range g.epochs {
 		_ = epoch
 		var totalLoss float64 = 0
 
-		for batch := 0; batch < len(inputs); batch += batchSize {
+		for batch := 0; batch < len(inputs); batch += g.batchSize {
 
-			batchEnd := min(batch+batchSize, len(inputs))
+			batchEnd := min(batch+g.batchSize, len(inputs))
 			batchX := inputs[batch:batchEnd]
 			batchY := targets[batch:batchEnd]
 			batchLoss := 0.0
@@ -286,7 +334,7 @@ func (g *GRU) Train(epochs, batchSize int) error {
 			for t := range batchX {
 				// Forward pass
 				g.Input = batchX[t]
-				predicted, err := g.forwardPass(0.2)
+				predicted, err := g.forwardPass(0)
 				if err != nil {
 					return err
 				}
@@ -301,8 +349,8 @@ func (g *GRU) Train(epochs, batchSize int) error {
 			g.updateWeights()
 			totalLoss += batchLoss
 		}
-		averageLoss := totalLoss / float64(len(inputs)/batchSize)
-		g.Errors = append(g.Errors, averageLoss)
+		averageLoss := totalLoss / float64(len(inputs)/g.batchSize)
+		// g.Errors = append(g.Errors, averageLoss)
 
 		if averageLoss < g.lossThreshold || math.Abs(g.prevLoss-averageLoss) < 1e-6 {
 			g.convergenceRounds = epoch + 1
@@ -311,12 +359,14 @@ func (g *GRU) Train(epochs, batchSize int) error {
 		}
 		g.prevLoss = averageLoss
 		if g.earlyStop != nil && g.earlyStop.CheckEarlyStop(averageLoss) {
-			// fmt.Printf("Early stop at epoch: %d\n", epoch)
+			fmt.Printf("Early stop at epoch: %d\n", epoch)
 			break
 		}
 		// fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, averageLoss)
 	}
 	g.earlyStop.Reset()
+	// TODO: remove this, only for testing, to get accuracy per round
+	g.Evaluate()
 
 	return nil
 }
@@ -437,10 +487,10 @@ func (g *GRU) ParseFile(filename string) error {
 		Y = append(Y, t2)
 	}
 
-	// shuffleData(X, Y)
-
 	g.X = g.Sx.FitTransform(X)
 	g.Y = g.Sy.FitTransform(Y)
+
+	shuffleData(g.X, g.Y)
 	// g.X = X
 	// g.Y = Y
 
@@ -455,20 +505,31 @@ func (g *GRU) Evaluate() ([]float64, []float64, error) {
 
 	predictions := make([]float64, 0, len(X))
 	expected := make([]float64, 0, len(Y))
+	accuracy := 0
+	mse := 0.0
 
 	for i := range len(X) {
 		output, err := g.Predict(X[i])
 		if err != nil {
 			return nil, nil, err
 		}
-		predictions = append(predictions, g.Sx.InverseTransform([][][]float64{output})[0][0][0])
-		expected = append(expected, g.Sy.InverseTransform([][][]float64{Y[i]})[0][0][0])
-		// predictions = append(predictions, output[0][0])
-		// expected = append(expected, Y[i][0][0])
+		guess := g.Sx.InverseTransform([][][]float64{output})[0][0][0]
+		actual := g.Sy.InverseTransform([][][]float64{Y[i]})[0][0][0]
+		predictions = append(predictions, guess)
+		expected = append(expected, actual)
+		mse += math.Pow(guess-actual, 2)
+		if math.Abs(guess-actual) <= 0.5 {
+			accuracy += 1
+		}
 	}
+	g.Accuracies = append(g.Accuracies, float64(accuracy)*100.0/float64(len(X)))
+	g.Errors = append(g.Errors, mse/float64(len(X)))
 	return predictions, expected, nil
 
 }
 func (g *GRU) GetErrors() []float64 {
 	return g.Errors
+}
+func (g *GRU) GetAccuracies() []float64 {
+	return g.Accuracies
 }
