@@ -13,3 +13,4 @@ xprmnts/
 *.py
 data/m*
 test_graphs/
+snapshots_*/
