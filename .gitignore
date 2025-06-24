@@ -5,8 +5,7 @@ graphviz/
 sumo/
 test_results.txt
 graph.info
-pythonNeural/
-pythonNetworkServer/
+python*/
 generatePlots.py
 plots/
 xprmnts/
@@ -14,3 +13,6 @@ xprmnts/
 data/m*
 test_graphs/
 snapshots_*/
+augmented_data/
+exper_*
+data_distributions/

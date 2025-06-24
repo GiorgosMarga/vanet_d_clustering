@@ -334,7 +334,7 @@ func (g *GRU) Train() error {
 			for t := range batchX {
 				// Forward pass
 				g.Input = batchX[t]
-				predicted, err := g.forwardPass(0)
+				predicted, err := g.forwardPass(0.3)
 				if err != nil {
 					return err
 				}

@@ -301,7 +301,7 @@ func CalculateMatDistance(arr1, arr2 []float64) float64 {
 	for i := range arr1 {
 		res += math.Pow(arr1[i]-arr2[i], 2)
 	}
-	return math.Sqrt(res)
+	return math.Sqrt(res) / float64(len(arr1))
 }
 
 func CalculateEuclDistance(arr1, arr2 []complex128) float64 {

@@ -49,20 +49,20 @@ func main() {
 	flag.Float64Var(&c, "c", 1.0, "c is the weight for degree")
 	flag.Float64Var(&trainSize, "ts", 0.8, "ts is the trainsize for the gru config.")
 
-	flag.IntVar(&hiddenSize, "hs", 32, "hs is the hidden size for gru config.")
+	flag.IntVar(&hiddenSize, "hs", 16, "hs is the hidden size for gru config.")
 
-	flag.IntVar(&inputSize, "is", 4, "is is the input size for gru config.")
+	flag.IntVar(&inputSize, "is", 32, "is is the input size for gru config.")
 
-	flag.IntVar(&epochs, "e", 20, "e is the epochs for gru config.")
+	flag.IntVar(&epochs, "e", 10, "e is the epochs for gru config.")
 
-	flag.IntVar(&batchSize, "bs", 3, "bs is the batch size for gru config.")
+	flag.IntVar(&batchSize, "bs", 5, "bs is the batch size for gru config.")
 
 	flag.IntVar(&patience, "pt", 20, "pt is the patience for early stopping for gru config.")
 
-	flag.IntVar(&parsevalValuesToSend, "pv2s", 5, "pv2s is the number of parseval values to send.")
+	flag.IntVar(&parsevalValuesToSend, "pv2s", 0, "pv2s is the number of parseval values to send.")
 
-	flag.Float64Var(&learningRate, "lr", 0.01, "lr is the learning rate for gru config.")
-	flag.IntVar(&sendWeightsPeriod, "swp", 1, "swp is the send weights period.")
+	flag.Float64Var(&learningRate, "lr", 0.001, "lr is the learning rate for gru config.")
+	flag.IntVar(&sendWeightsPeriod, "swp", 0, "swp is the send weights period.")
 	flag.Float64Var(&rnpPercentage, "rnp", 1.0, "rnp is random node partitipation percentage.")
 	flag.IntVar(&parsevalError, "pe", 0, "pe is the parseval error.")
 	flag.Float64Var(&lossThreshold, "lth", 0.001, "lth is the loss threshold.")
@@ -125,8 +125,8 @@ func main() {
 		fmt.Printf("Filename: %s -> Connectivity: %d%% | Clusters: %d | AverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
 	}
 	for _, node := range g.PoolOfNodes {
-		if node.Id%2 == 0 && node.TotalRounds > 0 {
-			fmt.Printf("Node [%d] (cluster head for %d rounds, messages %.2f, total rounds: %d) predict\n", node.Id, node.ClusterHeadRounds, float64(node.MessagesSent)/float64(node.TotalRounds), node.TotalRounds)
+		if node.IsCH() {
+			fmt.Printf("Node [%d] (cluster head for %d rounds, messages %d, total rounds: %d) predict\n", node.Id, node.ClusterHeadRounds, node.BytesSent, node.TotalRounds)
 			// node.Train()
 			node.Predict()
 		}

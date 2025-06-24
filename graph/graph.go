@@ -257,6 +257,8 @@ func (g *Graph) DHCV() {
 	}
 	wg.Wait()
 	g.formClusters()
+	cancelBeacon()
+
 	g.f.WriteString("Starting Exceptions\n")
 	// exception 1
 	for _, n := range orderedNodes {
@@ -415,7 +417,6 @@ mergeLoop:
 	g.formClusters()
 	g.Log(fmt.Sprintf("%v\n", g.clusters))
 
-	cancelBeacon()
 	// training
 	for _, n := range g.Nodes {
 		wg.Add(1)
