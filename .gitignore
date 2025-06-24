@@ -12,7 +12,6 @@ xprmnts/
 *.py
 data/m*
 test_graphs/
-snapshots_*/
 augmented_data/
 exper_*
 data_distributions/

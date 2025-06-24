@@ -5,9 +5,9 @@ if [ -z "$1" ]; then
     echo "Usage: $0 <snapshot_name>"
     exit 1
 fi
-
 # Assign the snapshot from the first argument
 SNAPSHOT=$1
+
 # Define learning rate values
 learning_rates=(0.001)
 

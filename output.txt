@@ -1,0 +1,28 @@
+Successfully created folder: (cars_info)
+Initialized 60 nodes
+[52]: CONTINUE expecting from 31
+All nodes finished training
+Filename: cars_015 -> Connectivity: 7% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_020 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_025 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+Converged at epoch: 6
+All nodes finished training
+Filename: cars_030 -> Connectivity: 8% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_035 -> Connectivity: 8% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_040 -> Connectivity: 10% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_045 -> Connectivity: 11% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_050 -> Connectivity: 10% | Clusters: 11 | AverageClusterSize: 5
+[44]: CONTINUE expecting from 41
+[52]: CONTINUE expecting from 12
+All nodes finished training
+Filename: cars_055 -> Connectivity: 9% | Clusters: 10 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_060 -> Connectivity: 9% | Clusters: 9 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_065 -> Connectivity: 10% | Clusters: 10 | AverageClusterSize: 6
