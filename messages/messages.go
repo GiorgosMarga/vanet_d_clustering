@@ -30,14 +30,15 @@ func NewMessage(from, to, ttl int, msg any) *Message {
 }
 
 type BeaconMessage struct {
-	Velocity float64
-	PosX     float64
-	PosY     float64
-	Angle    float64
-	Degree   int
-	SenderId int
-	Round    int
-	PCI      int
+	Velocity          float64
+	PosX              float64
+	PosY              float64
+	Angle             float64
+	Degree            int
+	SenderId          int
+	Round             int
+	PCI               int
+	ClusterHeadRounds int
 }
 
 type CNNMessage struct {
@@ -68,5 +69,6 @@ type ClusterWeightsMessage struct {
 
 type ParsevalMessage struct {
 	SenderId       int
-	ParsevalValues [][]float64
+	ParsevalValues []float64
+	Velocity       float64
 }

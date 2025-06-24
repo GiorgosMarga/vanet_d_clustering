@@ -17,6 +17,10 @@ func NewEarlyStop(patience int, delta float64) *EarlyStop {
 		bestLoss: math.MaxFloat64,
 	}
 }
+func (es *EarlyStop) Reset() {
+	es.counter = 0
+	es.bestLoss = math.MaxFloat64
+}
 func (es *EarlyStop) CheckEarlyStop(valLoss float64) bool {
 	if valLoss < es.bestLoss-es.delta {
 		es.counter = 0

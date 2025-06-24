@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/cmplx"
-	"math/rand/v2"
+	"math/rand"
 )
 
 func getDims(matrix [][]float64) (int, int) {
@@ -135,11 +135,12 @@ func MatrixOuterProduct(a, b [][]float64) [][]float64 {
 	return result
 }
 func RandomMatrix(rows, cols int, scale float64) [][]float64 {
+	r := rand.New(rand.NewSource(10))
 	matrix := make([][]float64, rows)
 	for i := range matrix {
 		matrix[i] = make([]float64, cols)
 		for j := range matrix[i] {
-			matrix[i][j] = (rand.Float64()*2 - 1) * scale // Range: [-scale, scale]
+			matrix[i][j] = (r.Float64()*2 - 1) * scale // Range: [-scale, scale]
 		}
 	}
 	return matrix
@@ -231,6 +232,12 @@ func FFT(x []float64) []complex128 {
 		res[i] = complex(x[i], 0)
 	}
 	fftRec(res, N)
+
+	// normalize values
+	sqrtN := math.Sqrt(float64(N))
+	for i := range res {
+		res[i] /= complex(sqrtN, 0)
+	}
 	return res
 }
 
@@ -280,7 +287,7 @@ func Parseval(arr []complex128) []float64 {
 	res := make([]float64, len(arr))
 
 	for i, c := range arr {
-		res[i] = cmplx.Abs(c)
+		res[i] = math.Pow(cmplx.Abs(c), 2)
 	}
 	return res
 }
@@ -292,8 +299,22 @@ func CalculateMatDistance(arr1, arr2 []float64) float64 {
 		panic("Different length")
 	}
 	for i := range arr1 {
-		res += math.Abs(arr1[i] - arr2[i])
+		res += math.Pow(arr1[i]-arr2[i], 2)
 	}
+	return math.Sqrt(res) / float64(len(arr1))
+}
 
+func CalculateEuclDistance(arr1, arr2 []complex128) float64 {
+	res := 0.0
+
+	if len(arr1) != len(arr2) {
+		panic("Different length")
+	}
+	for i := range arr1 {
+		dx := math.Pow(real(arr1[i])-real(arr2[i]), 2)
+		dy := math.Pow(imag(arr1[i])-imag(arr2[i]), 2)
+		res += math.Sqrt(dx + dy)
+
+	}
 	return res
 }

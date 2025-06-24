@@ -12,7 +12,21 @@ func TestSigmoid(t *testing.T) {
 		t.Errorf("Expected 0.5 got %f\n", sigmoid(0))
 	}
 }
+func TestFFT2(t *testing.T) {
+	gru := NewGRU(10, 10, 10, 0.001, 0.8)
+	gru.ParseFile("../data/car_50.txt")
 
+	gru2 := NewGRU(10, 10, 10, 0.001, 0.8)
+	gru2.ParseFile("../data/car_6.txt")
+
+	X, _, _ := gru.Evaluate()
+	X2, _, _ := gru2.Evaluate()
+	arr1 := matrix.FFT(X)
+	arr2 := matrix.FFT(X2)
+
+	fmt.Println(matrix.CalculateMatDistance(matrix.Parseval(arr1)[:5], matrix.Parseval(arr2)[:5]))
+
+}
 func TestMatrixMul(t *testing.T) {
 	size := 4
 	a := make([][]float64, size)
@@ -52,38 +66,43 @@ func TestElementMatrixMul(t *testing.T) {
 	// t.Error()
 
 }
-
-func TestTrain(t *testing.T) {
-	size := 800
-	X := make([][][]float64, size)
-	Y := make([][][]float64, size)
-
-	for i := range size {
-		X[i] = make([][]float64, 4)
-		Y[i] = make([][]float64, 1)
-		for j := range 4 {
-			X[i][j] = []float64{float64((i + 1) * j)}
-		}
-		Y[i][0] = []float64{float64(X[i][len(X[i])-1][0] + 1)}
-	}
-
-	shuffleData(X, Y)
-	g := NewGRU(16, 4, 10, MeanSquareError, 0.005, 0.8)
-	g.X = g.Sx.FitTransform(X)
-	g.Y = g.Sy.FitTransform(Y)
-	if err := g.Train(500, 20); err != nil {
-		t.Error(err)
-	}
-
-	pred, actual, err := g.Evaluate()
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Println(pred)
-	fmt.Println(actual)
-
+func TestDropout(t *testing.T) {
+	input := [][]float64{{0.3}, {0.4}, {0.5}, {0.6}}
+	fmt.Println(dropoutInput(input, 0.9))
 }
+
+// func TestTrain(t *testing.T) {
+// 	size := 800
+// 	X := make([][][]float64, size)
+// 	Y := make([][][]float64, size)
+
+// 	for i := range size {
+// 		X[i] = make([][]float64, 4)
+// 		Y[i] = make([][]float64, 1)
+// 		for j := range 4 {
+// 			X[i][j] = []float64{float64((i + 1) * j)}
+// 		}
+// 		Y[i][0] = []float64{float64(X[i][len(X[i])-1][0] + 1)}
+// 	}
+
+// 	shuffleData(X, Y)
+// 	g := NewGRU(16, 4, 10, 0.005, 0.8)
+// 	g.lossFunction = g.MeanSquareError
+// 	g.X = g.Sx.FitTransform(X)
+// 	g.Y = g.Sy.FitTransform(Y)
+// 	if err := g.Train(500, 20); err != nil {
+// 		t.Error(err)
+// 	}
+
+// 	pred, actual, err := g.Evaluate()
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+
+// 	fmt.Println(pred)
+// 	fmt.Println(actual)
+
+// }
 
 func TestIdentityMatrix(t *testing.T) {
 	t1 := matrix.IdentityMatrix(10, 10)

@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log"
@@ -8,10 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/GiorgosMarga/vanet_d_clustering/gru"
 	"github.com/GiorgosMarga/vanet_d_clustering/node"
 	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
@@ -33,9 +36,11 @@ type Graph struct {
 	f                *os.File
 	links            int
 	PoolOfNodes      map[int]*node.Node
+	algoConfig       *node.AlgoConfig
+	gruConfig        *gru.GRUConfig
 }
 
-func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
+func NewGraph(minClusterNumber, d, numOfNodes int, gruConfig *gru.GRUConfig, algoConfig *node.AlgoConfig) (*Graph, error) {
 	f, err := os.OpenFile(filepath.Join(utils.GetProjectRoot(), "graph_info", "graph.info"), os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
@@ -43,8 +48,8 @@ func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
 	pool := make(map[int]*node.Node)
 
 	for id := range numOfNodes {
-
-		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", id)))
+		filename := filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", id))
+		pool[id] = node.NewNode(id, d, 0, 0, 0, 0, filename, gruConfig, algoConfig)
 	}
 	fmt.Printf("Initialized %d nodes\n", numOfNodes)
 	return &Graph{
@@ -56,6 +61,8 @@ func NewGraph(minClusterNumber, d, numOfNodes int) (*Graph, error) {
 		links:            0,
 		f:                f,
 		PoolOfNodes:      pool,
+		algoConfig:       algoConfig,
+		gruConfig:        gruConfig,
 	}, nil
 }
 func (g *Graph) ResetGraph() {
@@ -64,6 +71,7 @@ func (g *Graph) ResetGraph() {
 		n.ResetNode()
 	}
 	g.links = 0
+	g.Nodes = make(map[int]*node.Node)
 }
 func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	g.ResetGraph()
@@ -80,6 +88,9 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	}
 
 	nodes, connections := string(splitted[0]), string(splitted[1])[:len(string(splitted[1]))-1]
+	if len(strings.Split(nodes, "\n")) != 60 {
+		fmt.Println(path, len(strings.Split(nodes, "\n")))
+	}
 	for _, n := range strings.Split(nodes, "\n") {
 		splitted := strings.Split(strings.TrimSpace(n), " ")
 		if len(splitted) != 5 {
@@ -102,9 +113,10 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 			n = g.PoolOfNodes[nodeId]
 		}
 		if n == nil {
-
-			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", nodeId)))
+			filename := filepath.Join(utils.GetProjectRoot(), "cars_info", fmt.Sprintf("car_%d.info", nodeId))
+			n := node.NewNode(nodeId, g.d, t[1], t[2], t[3], t[4], filename, g.gruConfig, g.algoConfig)
 			g.AddNode(n)
+			g.PoolOfNodes[n.Id] = n
 			continue
 		}
 		n.UpdateNode(t[1], t[2], t[3], t[4])
@@ -133,12 +145,13 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 		n1.AddNeighbor(n2)
 	}
 
-	for _, n := range g.Nodes {
-		if len(n.DHopNeighbors) == 0 {
-			// this node doesnt exist in the snapshot and should be removed
-			delete(g.Nodes, n.Id)
-		}
-	}
+	// for _, n := range g.Nodes {
+	// 	if len(n.DHopNeighbors) == 0 {
+	// 		// this node doesnt exist in the snapshot and should be removed
+	// 		delete(g.Nodes, n.Id)
+	// 		g.NumOfNodes--
+	// 	}
+	// }
 	return nil
 }
 
@@ -202,13 +215,38 @@ func (g *Graph) GenerateSUMOFile(filename string) error {
 	return nil
 }
 
+func (g *Graph) orderNodes() []*node.Node {
+	ordered := make([]*node.Node, 0, len(g.Nodes))
+
+	for _, v := range g.Nodes {
+		ordered = append(ordered, v)
+	}
+
+	slices.SortFunc(ordered, func(a, b *node.Node) int {
+		return cmp.Compare(a.Id, b.Id)
+	})
+	return ordered
+}
+
+func (g *Graph) orderClusters() []int {
+	ordered := make([]int, 0, len(g.Nodes))
+
+	for k := range g.clusters {
+		ordered = append(ordered, k)
+	}
+
+	sort.Ints(ordered)
+	return ordered
+}
+
 func (g *Graph) DHCV() {
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
 	beaconCTX, cancelBeacon := context.WithCancel(context.Background())
 	defer cancel()
 
-	for _, n := range g.Nodes {
+	orderedNodes := g.orderNodes()
+	for _, n := range orderedNodes {
 		go n.Beacon(beaconCTX)
 		go n.Start(ctx, g.d)
 		wg.Add(1)
@@ -219,8 +257,11 @@ func (g *Graph) DHCV() {
 	}
 	wg.Wait()
 	g.formClusters()
+	cancelBeacon()
+
+	g.f.WriteString("Starting Exceptions\n")
 	// exception 1
-	for _, n := range g.Nodes {
+	for _, n := range orderedNodes {
 		ch := n.PCH[g.d]
 		if ch.Id == n.Id {
 			continue
@@ -245,9 +286,13 @@ func (g *Graph) DHCV() {
 	g.Log(fmt.Sprintln(g.clusters))
 
 	g.Log(fmt.Sprintln("Exception 2"))
+
 	// exception 2
+	orderedClusters := g.orderClusters()
 exceptionLoop:
-	for chId, cluster := range g.clusters {
+	for idx := range orderedClusters {
+		chId := orderedClusters[idx]
+		cluster := g.clusters[chId]
 		// ch did not select itself as ch
 		ch := g.Nodes[chId]
 		if !slices.Contains(cluster, chId) {
@@ -270,14 +315,18 @@ exceptionLoop:
 				n.PCH[g.d] = ch.PCH[g.d]
 			}
 			delete(g.clusters, chId)
+			g.orderClusters()
 		}
 	}
 	g.formClusters()
 	g.Log(fmt.Sprintln(g.clusters))
 	g.Log(fmt.Sprintln("Exception 3"))
 	// exception 3
+
+	orderedClusters = g.orderClusters()
 exception3Loop:
-	for chId, cluster := range g.clusters {
+	for _, chId := range orderedClusters {
+		cluster := g.clusters[chId]
 		if len(cluster) == 1 {
 			// CH with no CMs
 			n := g.Nodes[chId]
@@ -298,9 +347,12 @@ exception3Loop:
 	g.formClusters()
 	g.Log(fmt.Sprintln(g.clusters))
 	g.Log(fmt.Sprintln("Merge clusters"))
+
 	// merge clusters
 mergeLoop:
-	for ch, cluster := range g.clusters {
+	for idx := range orderedClusters {
+		ch := orderedClusters[idx]
+		cluster := g.clusters[ch]
 		if len(cluster) <= g.minClusterNumber {
 			currCh := g.Nodes[ch]
 			g.Log(fmt.Sprintf("Found cluster with min members: %d\n", ch))
@@ -308,7 +360,8 @@ mergeLoop:
 			var bestChNode *node.Node
 			// TODO: search neighbor to d to find CHs
 			// checks all CHs that have distance <= d and calculates the relative mobility
-			for newPotentialCh := range g.clusters {
+			tOrdered := g.orderClusters()
+			for _, newPotentialCh := range tOrdered {
 				if ch != newPotentialCh {
 					chNode := g.Nodes[newPotentialCh]
 					pathTo := g.Nodes[ch].FindPath(chNode)
@@ -355,13 +408,15 @@ mergeLoop:
 					}
 				}
 				delete(g.clusters, currCh.Id)
+				g.orderClusters()
+
 			}
 		}
+
 	}
 	g.formClusters()
 	g.Log(fmt.Sprintf("%v\n", g.clusters))
 
-	cancelBeacon()
 	// training
 	for _, n := range g.Nodes {
 		wg.Add(1)

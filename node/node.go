@@ -1,6 +1,9 @@
 package node
 
+// TODO: check for d=3 and d=4 and d = 2 on my_data_2 parseval
+
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log"
@@ -11,6 +14,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/GiorgosMarga/vanet_d_clustering/gru"
 	"github.com/GiorgosMarga/vanet_d_clustering/matrix"
@@ -19,20 +23,15 @@ import (
 	"github.com/GiorgosMarga/vanet_d_clustering/utils"
 )
 
-const (
-	a                    = 0.1
-	b                    = 0.9
-	c                    = 1
-	TrainSizePercentage  = 0.8
-	HiddenStateSize      = 4
-	InputSize            = 4
-	Epochs               = 10
-	BatchSize            = 1
-	d                    = 2
-	ParsevalValuesToSend = 10
-	LearningRate         = 0.1
-	SendWeightsPeriod    = 1
-)
+type AlgoConfig struct {
+	A                    float64
+	B                    float64
+	C                    float64
+	ParsevalValuesToSend int
+	SendWeightPeriod     int
+	RnpPercentage        float64 // Random Node Partitipation percentage, if it is set to 1, all nodes participate
+	ParsevalError        float64
+}
 
 const (
 	BeaconService = iota
@@ -57,26 +56,33 @@ type Node struct {
 	finishChan        chan struct{}
 	internalChans     map[int]chan any
 	f                 *os.File
+	d                 int
 	round             int
 	subscribers       map[int]struct{}
 	gru               neuralnetwork.NeuralNetwork
 	weightMessages    map[int]*messages.WeightsMessage
 	mtx               *sync.Mutex
 	sendWeightsPeriod int
+	ClusterHeadRounds int
+	MessagesSent      int
+	TotalRounds       int
+	algoConfig        *AlgoConfig
+	BytesSent         int
 }
 
-func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *Node {
+func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gruConfig *gru.GRUConfig, algoConfig *AlgoConfig) *Node {
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
+	nn := gru.NewGRU(gruConfig)
 
-	nn := gru.NewGRU(HiddenStateSize, InputSize, 10, gru.MeanSquareError, LearningRate, TrainSizePercentage)
+	// file := rand.Intn(61) % 60
+	file := id % 60
 
-	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", fmt.Sprintf("car_%d.txt", id%60))); err != nil {
+	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "augmented_data", fmt.Sprintf("car_%d.txt", file))); err != nil {
 		panic(err)
 	}
-
 	return &Node{
 		Id:       id,
 		Velocity: velocity,
@@ -103,7 +109,11 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string) *N
 		gru:               nn,
 		weightMessages:    make(map[int]*messages.WeightsMessage),
 		mtx:               &sync.Mutex{},
-		sendWeightsPeriod: 1,
+		sendWeightsPeriod: 0,
+		d:                 d,
+		ClusterHeadRounds: 0,
+		MessagesSent:      0,
+		algoConfig:        algoConfig,
 	}
 }
 
@@ -112,6 +122,7 @@ func (n *Node) UpdateNode(posx, posy, velocity, angle float64) {
 	n.PosY = posy
 	n.Velocity = velocity
 	n.Angle = angle
+	n.msgChan = make(chan *messages.Message, 1000)
 	n.internalChans = map[int]chan any{
 		BeaconService:         make(chan any),
 		CNNService:            make(chan any),
@@ -124,15 +135,38 @@ func (n *Node) UpdateNode(posx, posy, velocity, angle float64) {
 }
 
 func (n *Node) ResetNode() {
+	n.mtx.Lock()
+	defer n.mtx.Unlock()
+
 	n.round = 1
-	n.PCH = make([]*Node, len(n.PCH))
-	n.CNN = make([]*Node, len(n.CNN))
+	n.PCH = make([]*Node, n.d+1)
+	n.CNN = make([]*Node, n.d+1)
 	n.DHopNeighbors = make(map[int]*Node)
 	n.subscribers = make(map[int]struct{})
 }
+func totalByteSize(data [][][]float64) int {
+	size := 0
 
+	// Outer slice header
+	size += int(unsafe.Sizeof(data)) // slice header: 24 bytes
+
+	for _, twoD := range data {
+		// Middle slice headers
+		size += len(twoD) * int(unsafe.Sizeof(twoD))
+		for _, oneD := range twoD {
+			// Inner slice headers
+			size += int(unsafe.Sizeof(oneD))
+			// Actual float64 values
+			size += len(oneD) * int(unsafe.Sizeof(float64(0)))
+		}
+	}
+
+	return size
+}
 func (n *Node) SendWeights() {
-	n.sendMsg(messages.NewMessage(n.Id, n.PCH[d].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: n.gru.GetWeights()}))
+	weights := n.gru.GetWeights()
+	n.BytesSent += totalByteSize(weights)
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[n.d].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: weights}))
 }
 func PrintPath(path []*Node) string {
 	s := ""
@@ -151,13 +185,14 @@ func (n *Node) Predict() error {
 	}
 	n.f.WriteString(fmt.Sprintf("%+v\n", predicted))
 	n.f.WriteString(fmt.Sprintf("%+v\n", actual))
-	n.f.WriteString(fmt.Sprintf("%+v\n", n.gru.GetErrors()))
+	n.f.WriteString(fmt.Sprintf("Errors: %+v\n", n.gru.GetErrors()))
+	n.f.WriteString(fmt.Sprintf("Accuracies: %+v\n", n.gru.GetAccuracies()))
 	return nil
 }
 func (n *Node) Train() error {
 
 	n.f.WriteString(fmt.Sprintf("Training node %d\n", n.Id))
-	if err := n.gru.Train(Epochs, BatchSize); err != nil {
+	if err := n.gru.Train(); err != nil {
 		return err
 	}
 	n.f.WriteString(fmt.Sprintf("Finished training node %d\n", n.Id))
@@ -166,10 +201,11 @@ func (n *Node) Train() error {
 	return nil
 }
 
-func (n *Node) handleParsevalExchange(clusterSize int) {
+func (n *Node) handleParsevalExchange(clusterSize int) int {
+	parsevalSimilarities := 0
 	timer := time.NewTimer(500 * time.Millisecond)
 	defer timer.Stop()
-	parsevalValues := make([][][]float64, 0, clusterSize)
+	parsevalValues := make([]*messages.ParsevalMessage, 0, clusterSize)
 parsevalLoop:
 	for range clusterSize - 1 {
 		select {
@@ -178,26 +214,47 @@ parsevalLoop:
 			if !ok {
 				continue
 			}
-			parsevalValues = append(parsevalValues, parsevalMessage.ParsevalValues)
+			parsevalValues = append(parsevalValues, parsevalMessage)
 		case <-timer.C:
 			n.f.WriteString(fmt.Sprintf("[%d]: Received %d/%d parseval values\n", n.Id, len(parsevalValues), clusterSize-1))
-			fmt.Printf("[%d]: Received %d/%d parseval values\n", n.Id, len(parsevalValues), clusterSize)
 			break parsevalLoop
 		}
 	}
-	// n.f.WriteString("Parseval Values received: \n")
-	// for _, parsevalValue := range parsevalValues {
-	// 	n.f.WriteString(fmt.Sprintf("%+v\n", parsevalValue))
-	// }
+
+	removedIds := make([]int, 0, clusterSize)
+	for i := range parsevalValues {
+		if slices.Contains(removedIds, i) {
+			continue
+		}
+		for j := i + 1; j < len(parsevalValues); j++ {
+			dist := matrix.CalculateMatDistance(parsevalValues[i].ParsevalValues, parsevalValues[j].ParsevalValues)
+			// fmt.Println(dist, math.Sqrt(1000*1677*0.8))
+			if dist < 150.0 {
+				n.f.WriteString(fmt.Sprintf("Found 2 close parsevals %d and %d\n", parsevalValues[i].SenderId, parsevalValues[j].SenderId))
+				parsevalSimilarities++
+				if parsevalValues[i].Velocity < parsevalValues[j].Velocity {
+					// in that case node wont send weights for x rounds
+					n.sendMsg(messages.NewMessage(n.Id, parsevalValues[i].SenderId, messages.DefaultTTL, &messages.ParsevalMessage{SenderId: n.Id}))
+					break
+				} else {
+					n.sendMsg(messages.NewMessage(n.Id, parsevalValues[j].SenderId, messages.DefaultTTL, &messages.ParsevalMessage{SenderId: n.Id}))
+					removedIds = append(removedIds, parsevalValues[j].SenderId)
+				}
+			}
+		}
+	}
+	return parsevalSimilarities
 }
 func (n *Node) handleMembersWeightExchange(clusterSize int) [][][]float64 {
+	if clusterSize <= 1 {
+		return n.gru.GetWeights()
+	}
 	weights := make([][][][]float64, 1, clusterSize)
 	weights[0] = n.gru.GetWeights()
 	timer := time.NewTimer(500 * time.Millisecond)
 	defer timer.Stop()
-
 membersLoop:
-	for range clusterSize - 1 {
+	for range int(float64((clusterSize - 1)) * n.algoConfig.RnpPercentage) {
 		select {
 		case msg := <-n.internalChans[WeightsService]:
 			weightMessage, ok := msg.(*messages.WeightsMessage)
@@ -218,7 +275,7 @@ func (n *Node) handleClusterHeadsWeightExchange(averageWeights [][][]float64, cl
 	// send average weights to all cluster heads
 	for clusterId := range clusters {
 		// don't send to itself
-		if clusterId == n.PCH[d].Id {
+		if clusterId == n.PCH[n.d].Id {
 			continue
 		}
 		n.sendMsg(messages.NewMessage(n.Id, clusterId, messages.DefaultTTL, &messages.ClusterWeightsMessage{
@@ -260,27 +317,39 @@ clustersLoop:
 	return totalAverage
 }
 
-// TODO: change cluster size and fix function (no if/else) split ?
 func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
-	if n.sendWeightsPeriod < SendWeightsPeriod {
+	if n.sendWeightsPeriod < n.algoConfig.SendWeightPeriod {
 		n.f.WriteString("Skipping this round\n")
 		n.sendWeightsPeriod++
 		return
 	}
 
 	// reset period
-	n.sendWeightsPeriod = 1
+	n.sendWeightsPeriod = 0
 
-	myCluster := clusters[n.PCH[d].Id]
-	clusterSize := len(myCluster)
+	myCluster := clusters[n.PCH[n.d].Id]
+	clusterSize := int(math.Ceil(float64(len(myCluster)) * n.algoConfig.RnpPercentage))
 
 	if n.IsCH() {
 		n.f.WriteString(fmt.Sprintf("[%d]: Expecting %d weights\n", n.Id, clusterSize-1))
+		var similarities int = 0
+		var averageMembersWeights [][][]float64
+		if n.algoConfig.ParsevalValuesToSend > 0 {
+			similarities = n.handleParsevalExchange(clusterSize)
+		}
+		if n.algoConfig.ParsevalValuesToSend > 0 || n.algoConfig.RnpPercentage != 1 {
+			ctr := 0
+			for _, nodeId := range myCluster {
+				if ctr >= len(myCluster)-clusterSize {
+					break
+				}
+				ctr += 1
+				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.ParsevalMessage{SenderId: n.Id}))
+			}
+		}
 
-		n.handleParsevalExchange(clusterSize)
-
-		averageMembersWeights := n.handleMembersWeightExchange(clusterSize)
+		averageMembersWeights = n.handleMembersWeightExchange(clusterSize - similarities)
 
 		totalAverage := n.handleClusterHeadsWeightExchange(averageMembersWeights, clusters)
 
@@ -299,10 +368,38 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 	}
 
 	// this is executed only by the cluster members
-	n.SendParsevalValues()
-	n.SendWeights()
+	if n.algoConfig.ParsevalValuesToSend > 0 {
+		n.SendParsevalValues()
+	}
+
+	var sendWeights = true
 	timer := time.NewTimer(1 * time.Second)
 	defer timer.Stop()
+	if n.algoConfig.ParsevalValuesToSend > 0 || n.algoConfig.RnpPercentage != 1 {
+		select {
+		case msg := <-n.internalChans[ParsevalService]:
+			parsevalResponse, ok := msg.(*messages.ParsevalMessage)
+			if !ok {
+				break
+			}
+			// if cluster head sends back a parseval messages it means that this node should not send the weights
+			// for x rounds
+			if parsevalResponse.SenderId == n.PCH[n.d].Id {
+				n.sendWeightsPeriod -= 1 // skip for two rounds
+				if !timer.Stop() {
+					<-timer.C
+				}
+				sendWeights = false
+			}
+		case <-timer.C:
+			break
+
+		}
+	}
+	if sendWeights {
+		n.SendWeights()
+	}
+	timer.Reset(1 * time.Second)
 	select {
 	case msg := <-n.internalChans[WeightsService]:
 		weightsMessage, ok := msg.(*messages.WeightsMessage)
@@ -312,37 +409,22 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		if err := n.gru.SetWeights(weightsMessage.Weights); err != nil {
 			panic(err)
 		}
-		n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.PCH[d].Id, weightsMessage.SenderId))
+		n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.PCH[n.d].Id, weightsMessage.SenderId))
 	case <-timer.C:
-		fmt.Printf("[%d]: Did not receive weights\n", n.Id)
-		n.printPCH()
+		n.f.WriteString(fmt.Sprintf("[%d]: Did not receive weights\n", n.Id))
 	}
 }
 
 func (n *Node) SendParsevalValues() {
-	weights := n.gru.GetWeights()
-	parsevalValues := make([][]float64, len(weights))
-	for i, weight := range weights {
-		parsevalValue := matrix.Parseval(matrix.FFT(matrix.Flatten(weight)))
-		if len(parsevalValue) > ParsevalValuesToSend {
-			parsevalValue = parsevalValue[:ParsevalValuesToSend]
-		}
-		parsevalValues[i] = parsevalValue
-	}
 
-	n.sendMsg(messages.NewMessage(n.Id, n.PCH[d].Id, messages.DefaultTTL, &messages.ParsevalMessage{
+	parsevalValues := n.gru.GetParsevalValues(n.algoConfig.ParsevalValuesToSend)
+
+	n.sendMsg(messages.NewMessage(n.Id, n.PCH[n.d].Id, messages.DefaultTTL, &messages.ParsevalMessage{
 		SenderId:       n.Id,
 		ParsevalValues: parsevalValues,
+		Velocity:       n.Velocity,
 	}))
 
-}
-func (n *Node) printPCH() {
-	fmt.Printf("[%d]: PCH: %d\n", n.Id, n.PCH[d].Id)
-	fmt.Printf("[%d]: ", n.Id)
-	for i := range d {
-		fmt.Printf("%d ", n.PCH[i].Id)
-	}
-	fmt.Println()
 }
 
 func (n *Node) AddNeighbor(neighbor *Node) {
@@ -354,10 +436,10 @@ func (n *Node) Degree() int {
 	return len(n.DHopNeighbors)
 }
 func (n *Node) IsCH() bool {
-	if n.PCH[d] == nil {
+	if n.PCH[n.d] == nil {
 		panic(fmt.Sprintf("[%d]: %+v\n", n.Id, n.PCH))
 	}
-	return n.PCH[d].Id == n.Id
+	return n.PCH[n.d].Id == n.Id
 }
 
 func (n *Node) GetdHopNeighs(d int) map[int]*Node {
@@ -365,7 +447,7 @@ func (n *Node) GetdHopNeighs(d int) map[int]*Node {
 	q := make([]*Node, 1)
 	q[0] = n
 	visited[n.Id] = struct{}{}
-	for i := 0; i < d; i++ {
+	for i := 0; i < n.d; i++ {
 		for _, cn := range q {
 			q = q[1:]
 			for _, nn := range cn.DHopNeighbors {
@@ -399,11 +481,12 @@ func (n *Node) bcast(msg *messages.Message) {
 				<-timer.C
 			}
 		case <-timer.C:
-			n.f.WriteString(fmt.Sprintf("Failed to send message (bcast) to: (%d)\n", cn.Id))
+			n.f.WriteString(fmt.Sprintf("Failed to send message (bcast) to: (%d) %v %d\n", cn.Id, msg.Msg, len(n.DHopNeighbors)))
 		}
 	}
 }
 func (n *Node) sendMsg(msg *messages.Message) {
+	n.MessagesSent += 1
 	timer := time.NewTimer(500 * time.Millisecond)
 	defer timer.Stop()
 	if c, ok := n.DHopNeighbors[msg.To]; ok {
@@ -420,45 +503,36 @@ func (n *Node) sendMsg(msg *messages.Message) {
 func (n *Node) sendBeacons() {
 	for _, ne := range n.DHopNeighbors {
 		msg := messages.NewMessage(n.Id, ne.Id, messages.DefaultTTL, &messages.BeaconMessage{
-			Velocity: n.Velocity,
-			PosX:     n.PosX,
-			PosY:     n.PosY,
-			Angle:    n.Angle,
-			SenderId: n.Id,
-			Round:    1,
+			Velocity:          n.Velocity,
+			PosX:              n.PosX,
+			PosY:              n.PosY,
+			Angle:             n.Angle,
+			SenderId:          n.Id,
+			Round:             1,
+			ClusterHeadRounds: n.ClusterHeadRounds,
 		})
 		n.sendMsg(msg)
+		// dont count beacon messages
+		n.MessagesSent--
 	}
 }
 func (n *Node) advertiseCNN() {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	for subId := range n.subscribers {
-		for round, cnn := range n.CNN {
-			if cnn == nil {
-				break
-			}
+	for round := 2; round <= n.d; round++ {
+		if n.CNN[round] == nil {
+			return
+		}
+		for subId := range n.subscribers {
 			msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.CNNMessage{
 				SenderId: n.Id,
-				Round:    round + 1,
-				CNN:      n.CNN[round],
+				Round:    round,
+				CNN:      n.CNN[round-1], // need to send the cnn of the previous round, to satisfy the d distance
+				// this message will be sent to all nodes that have selected this node as a cnn in the previous round
 			})
+			n.MessagesSent--
 			n.sendMsg(msg)
 		}
-	}
-}
-
-func (n *Node) advertiseCluster() {
-	if n.PCH[d] == nil {
-		return
-	}
-	for subId := range n.DHopNeighbors {
-		msg := messages.NewMessage(n.Id, subId, messages.DefaultTTL, &messages.ClusterMessage{
-			Sender:    n.Id,
-			ClusterId: n.PCH[d].Id,
-			IsCh:      n.IsCH(),
-		})
-		n.sendMsg(msg)
 	}
 }
 
@@ -483,10 +557,11 @@ func (n *Node) Start(ctx context.Context, d int) {
 	var (
 		messagesReceived = make(map[int]struct{})
 	)
+	n.TotalRounds++
 
-	// initialization
-	n.CNN[0] = n
-	n.PCH[0] = n
+	// // initialization
+	// n.CNN[0] = n
+	// n.PCH[0] = n
 
 	for {
 		select {
@@ -520,7 +595,7 @@ func (n *Node) Start(ctx context.Context, d int) {
 			n.f.WriteString(fmt.Sprintf("[%d]: Terminating...\n", n.Id))
 			return
 		default:
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
@@ -538,7 +613,7 @@ func (n *Node) handleClusterWeightsMessage(msg *messages.ClusterWeightsMessage) 
 func (n *Node) handleBeaconMessage(msg *messages.BeaconMessage) {
 	// since we update the nodes, the channel may still have a messages from previous snapshot
 	// the message may be from an old neighbor
-	// if it is from an old neighbor we should ignore its
+	// if it is from an old neighbor we should ignore it
 	_, ok := n.DHopNeighbors[msg.SenderId]
 	if msg.Round != n.round || !ok {
 		return
@@ -580,16 +655,23 @@ func (n *Node) RelativeMax(d int) {
 
 	if len(n.DHopNeighbors) == 0 {
 		// node has no neighbors
-		for i := 1; i <= d; i++ {
+		for i := 1; i <= n.d; i++ {
 			n.CNN[i] = n
 			n.PCH[i] = n
 		}
-		panic("No neighbors")
+		return
 	}
 
+	defer func() {
+		if n.IsCH() {
+			n.ClusterHeadRounds++
+		}
+	}()
 	// In the first round, each node finds the CNN based on it's neighborhood.
 	n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 	msgs := make(map[*messages.BeaconMessage]struct{})
+
+	senders := make(map[int]struct{})
 
 	for len(msgs) < len(n.DHopNeighbors) {
 		newMsg := <-n.internalChans[BeaconService]
@@ -597,13 +679,18 @@ func (n *Node) RelativeMax(d int) {
 		if !ok || beaconMessage.Round != 1 {
 			continue
 		}
+		_, exists := senders[beaconMessage.SenderId]
+		if exists {
+			continue
+		}
 		msgs[beaconMessage] = struct{}{}
+		senders[beaconMessage.SenderId] = struct{}{}
 	}
 
 	minRelativeMob := math.MaxFloat64
 	for msg := range msgs {
 		cnn := n.DHopNeighbors[msg.SenderId]
-		relativeMobility := n.CNN[0].GetRelativeMobility(msg.Velocity, msg.Angle, msg.PosX, msg.PosY, cnn.Degree(), cnn.PCI())
+		relativeMobility := n.CNN[0].GetRelativeMobility(msg.Velocity, msg.Angle, msg.PosX, msg.PosY, cnn.Degree(), cnn.ClusterHeadRounds)
 		n.f.WriteString(fmt.Sprintf("Comparing CNN: %d with %d (%f)\n", n.CNN[0].Id, msg.SenderId, relativeMobility))
 		if (relativeMobility < minRelativeMob) || (relativeMobility == minRelativeMob && n.CNN[0].Degree() < cnn.Degree()) {
 			n.CNN[1] = cnn
@@ -615,11 +702,12 @@ func (n *Node) RelativeMax(d int) {
 	} else {
 		n.PCH[1] = n.PCH[0]
 
-		for n.round = 2; n.round <= d; n.round++ {
+		for n.round = 2; n.round <= n.d; n.round++ {
 			n.PCH[n.round] = n
 			n.CNN[n.round] = n
-			n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
 		}
+		n.round = n.d
+		n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d, round: %d\n", n.PCH[n.d].Id, n.round))
 		return
 	}
 
@@ -630,7 +718,7 @@ func (n *Node) RelativeMax(d int) {
 	n.sendMsg(subMsg)
 
 	// for the rest of the rounds the CNN is selected based on what the previous CNN has selected
-	for n.round = 2; n.round <= d; {
+	for n.round = 2; n.round <= n.d; {
 		timer := time.NewTimer(500 * time.Millisecond)
 		n.f.WriteString(fmt.Sprintf("Starting round: %d\n", n.round))
 		var newMsg any
@@ -640,12 +728,12 @@ func (n *Node) RelativeMax(d int) {
 				<-timer.C
 			}
 		case <-timer.C:
-			fmt.Printf("[%d]: Error here\n", n.Id)
+			fmt.Printf("[%d]: CONTINUE expecting from %d\n", n.Id, n.PCH[1].Id)
 			continue
 		}
 
 		cnnMessage, ok := newMsg.(*messages.CNNMessage)
-		if !ok || cnnMessage.Round != n.round || cnnMessage.SenderId != n.PCH[n.round-1].Id {
+		if !ok || cnnMessage.Round != n.round || cnnMessage.SenderId != n.PCH[1].Id {
 			continue
 		}
 		cnn, ok := cnnMessage.CNN.(*Node)
@@ -661,9 +749,9 @@ func (n *Node) RelativeMax(d int) {
 		n.f.WriteString(fmt.Sprintf("[%d]: Round %d: CNN: %d, PCH: %d\n", n.Id, n.round, n.CNN[n.round].Id, n.PCH[n.round].Id))
 		n.round++
 	}
-	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[d].Id))
+	n.f.WriteString(fmt.Sprintf("Finished all rounds my CH: %d\n", n.PCH[n.d].Id))
 }
-func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, pci int) float64 {
+func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, ClusterHeadRounds int) float64 {
 	dx := math.Pow(n.PosX-x, 2)
 	dy := math.Pow(n.PosY-y, 2)
 	dxy := math.Sqrt(dx + dy)
@@ -671,7 +759,9 @@ func (n *Node) GetRelativeMobility(vel, angle, x, y float64, degree, pci int) fl
 	dvelocityX := math.Abs(math.Cos(angle)*vel - math.Cos(n.Angle)*n.Velocity)
 
 	// Using degree
-	return a*dxy + b*dvelocityX + c*(float64(n.Degree())-float64(degree))
+	// return a*dxy + b*dvelocityX + c*(float64(n.Degree())-float64(degree))
+	// using degree + cluster head counter
+	return n.algoConfig.A*dxy + n.algoConfig.B*dvelocityX + n.algoConfig.C*(float64(n.Degree())-float64(degree))
 	// Using PCI
 	// return a*dxy + b*math.Abs(n.Velocity-vel) + c*(float64(n.PCI())-float64(n.PCI()))
 
@@ -694,7 +784,8 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 		}
 		visited[cState.node.Id] = struct{}{}
 		q = q[1:]
-		for _, n := range cState.node.DHopNeighbors {
+		orderedNeighbors := cState.node.getOrderedNeighbors()
+		for _, n := range orderedNeighbors {
 			if _, ok := visited[n.Id]; ok {
 				continue
 			}
@@ -710,7 +801,19 @@ func (n *Node) FindPath(tNode *Node) []*Node {
 	}
 	return []*Node{}
 }
+func (n *Node) getOrderedNeighbors() []*Node {
+	orderedNeighbors := make([]*Node, 0, len(n.DHopNeighbors))
 
+	for _, neighbor := range n.DHopNeighbors {
+		orderedNeighbors = append(orderedNeighbors, neighbor)
+	}
+
+	slices.SortFunc(orderedNeighbors, func(a, b *Node) int {
+		return cmp.Compare(a.Id, b.Id)
+	})
+
+	return orderedNeighbors
+}
 func (n *Node) PCI() int {
 	pciTable := make([]int, len(n.DHopNeighbors))
 	idx := 0
