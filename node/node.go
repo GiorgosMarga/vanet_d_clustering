@@ -28,7 +28,8 @@ type AlgoConfig struct {
 	B                    float64
 	C                    float64
 	ParsevalValuesToSend int
-	SendWeightPeriod     int
+	LocalAveragePeriod   int
+	GlobalAveragePeriod  int
 	RnpPercentage        float64 // Random Node Partitipation percentage, if it is set to 1, all nodes participate
 	ParsevalError        float64
 }
@@ -44,30 +45,33 @@ const (
 )
 
 type Node struct {
-	Id                int
-	DHopNeighbors     map[int]*Node
-	Velocity          float64
-	PosX              float64
-	PosY              float64
-	Angle             float64
-	CNN               []*Node
-	PCH               []*Node
-	msgChan           chan *messages.Message
-	finishChan        chan struct{}
-	internalChans     map[int]chan any
-	f                 *os.File
-	d                 int
-	round             int
-	subscribers       map[int]struct{}
-	gru               neuralnetwork.NeuralNetwork
-	weightMessages    map[int]*messages.WeightsMessage
-	mtx               *sync.Mutex
-	sendWeightsPeriod int
-	ClusterHeadRounds int
-	MessagesSent      int
-	TotalRounds       int
-	algoConfig        *AlgoConfig
-	BytesSent         int
+	Id                  int
+	DHopNeighbors       map[int]*Node
+	Velocity            float64
+	PosX                float64
+	PosY                float64
+	Angle               float64
+	CNN                 []*Node
+	PCH                 []*Node
+	msgChan             chan *messages.Message
+	finishChan          chan struct{}
+	internalChans       map[int]chan any
+	f                   *os.File
+	d                   int
+	round               int
+	subscribers         map[int]struct{}
+	gru                 neuralnetwork.NeuralNetwork
+	weightMessages      map[int]*messages.WeightsMessage
+	mtx                 *sync.Mutex
+	localAveragePeriod  int
+	localRound          int
+	globalAveragePeriod int
+	globalRound         int
+	ClusterHeadRounds   int
+	MessagesSent        int
+	TotalRounds         int
+	algoConfig          *AlgoConfig
+	BytesSent           int
 }
 
 func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gruConfig *gru.GRUConfig, algoConfig *AlgoConfig) *Node {
@@ -101,19 +105,22 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 			ClusterWeightsService: make(chan any),
 			ParsevalService:       make(chan any),
 		},
-		round:             1,
-		finishChan:        make(chan struct{}),
-		f:                 f,
-		DHopNeighbors:     make(map[int]*Node),
-		subscribers:       make(map[int]struct{}),
-		gru:               nn,
-		weightMessages:    make(map[int]*messages.WeightsMessage),
-		mtx:               &sync.Mutex{},
-		sendWeightsPeriod: 0,
-		d:                 d,
-		ClusterHeadRounds: 0,
-		MessagesSent:      0,
-		algoConfig:        algoConfig,
+		round:               1,
+		finishChan:          make(chan struct{}),
+		f:                   f,
+		DHopNeighbors:       make(map[int]*Node),
+		subscribers:         make(map[int]struct{}),
+		gru:                 nn,
+		weightMessages:      make(map[int]*messages.WeightsMessage),
+		mtx:                 &sync.Mutex{},
+		localAveragePeriod:  algoConfig.LocalAveragePeriod - 1,
+		localRound:          algoConfig.LocalAveragePeriod - 1,
+		globalAveragePeriod: algoConfig.GlobalAveragePeriod - 1,
+		globalRound:         algoConfig.GlobalAveragePeriod - 1,
+		d:                   d,
+		ClusterHeadRounds:   0,
+		MessagesSent:        0,
+		algoConfig:          algoConfig,
 	}
 }
 
@@ -228,8 +235,8 @@ parsevalLoop:
 		}
 		for j := i + 1; j < len(parsevalValues); j++ {
 			dist := matrix.CalculateMatDistance(parsevalValues[i].ParsevalValues, parsevalValues[j].ParsevalValues)
-			// fmt.Println(dist, math.Sqrt(1000*1677*0.8))
-			if dist < 150.0 {
+			// fmt.Println(dist)
+			if dist < n.algoConfig.ParsevalError {
 				n.f.WriteString(fmt.Sprintf("Found 2 close parsevals %d and %d\n", parsevalValues[i].SenderId, parsevalValues[j].SenderId))
 				parsevalSimilarities++
 				if parsevalValues[i].Velocity < parsevalValues[j].Velocity {
@@ -319,15 +326,6 @@ clustersLoop:
 
 func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
-	if n.sendWeightsPeriod < n.algoConfig.SendWeightPeriod {
-		n.f.WriteString("Skipping this round\n")
-		n.sendWeightsPeriod++
-		return
-	}
-
-	// reset period
-	n.sendWeightsPeriod = 0
-
 	myCluster := clusters[n.PCH[n.d].Id]
 	clusterSize := int(math.Ceil(float64(len(myCluster)) * n.algoConfig.RnpPercentage))
 
@@ -350,8 +348,14 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 		}
 
 		averageMembersWeights = n.handleMembersWeightExchange(clusterSize - similarities)
-
-		totalAverage := n.handleClusterHeadsWeightExchange(averageMembersWeights, clusters)
+		var totalAverage [][][]float64
+		if n.globalRound == n.algoConfig.GlobalAveragePeriod {
+			totalAverage = n.handleClusterHeadsWeightExchange(averageMembersWeights, clusters)
+			n.globalRound -= n.globalAveragePeriod // reset
+		} else {
+			totalAverage = averageMembersWeights
+			n.globalRound++
+		}
 
 		// send average weights back to members
 		for _, nodeId := range myCluster {
@@ -385,7 +389,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 			// if cluster head sends back a parseval messages it means that this node should not send the weights
 			// for x rounds
 			if parsevalResponse.SenderId == n.PCH[n.d].Id {
-				n.sendWeightsPeriod -= 1 // skip for two rounds
+				n.localRound -= 1
 				if !timer.Stop() {
 					<-timer.C
 				}
@@ -396,8 +400,9 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
 		}
 	}
-	if sendWeights {
-		n.SendWeights()
+	if !sendWeights || n.localRound != n.algoConfig.LocalAveragePeriod {
+		n.localRound++
+		return
 	}
 	timer.Reset(1 * time.Second)
 	select {
