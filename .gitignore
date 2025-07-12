@@ -5,7 +5,7 @@ graphviz/
 sumo/
 test_results.txt
 graph.info
-python*/
+pythonN*/
 generatePlots.py
 plots/
 xprmnts/
