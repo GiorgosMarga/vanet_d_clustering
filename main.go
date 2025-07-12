@@ -31,7 +31,8 @@ func main() {
 		patience             int
 		parsevalValuesToSend int
 		learningRate         float64
-		sendWeightsPeriod    int
+		localAveragePeriod   int
+		globalAveragePeriod  int
 		rnpPercentage        float64
 		parsevalError        int
 		lossThreshold        float64
@@ -62,7 +63,8 @@ func main() {
 	flag.IntVar(&parsevalValuesToSend, "pv2s", 0, "pv2s is the number of parseval values to send.")
 
 	flag.Float64Var(&learningRate, "lr", 0.001, "lr is the learning rate for gru config.")
-	flag.IntVar(&sendWeightsPeriod, "swp", 0, "swp is the send weights period.")
+	flag.IntVar(&localAveragePeriod, "lap", 1, "lap is the local average period.")
+	flag.IntVar(&globalAveragePeriod, "gap", 1, "gap is the global average period.")
 	flag.Float64Var(&rnpPercentage, "rnp", 1.0, "rnp is random node partitipation percentage.")
 	flag.IntVar(&parsevalError, "pe", 100, "pe is the parseval error.")
 	flag.Float64Var(&lossThreshold, "lth", 0.001, "lth is the loss threshold.")
@@ -98,7 +100,8 @@ func main() {
 		B:                    b,
 		C:                    c,
 		ParsevalValuesToSend: parsevalValuesToSend,
-		SendWeightPeriod:     sendWeightsPeriod,
+		LocalAveragePeriod:   localAveragePeriod,
+		GlobalAveragePeriod:  globalAveragePeriod,
 		RnpPercentage:        rnpPercentage, // Random Node Partitipation percentage, if it is set to 1, all nodes participate
 		ParsevalError:        float64(parsevalError),
 	})

@@ -518,7 +518,7 @@ func (g *GRU) Evaluate() ([]float64, []float64, error) {
 		predictions = append(predictions, guess)
 		expected = append(expected, actual)
 		mse += math.Pow(guess-actual, 2)
-		if math.Abs(guess-actual)/math.Abs(actual) < 0.3 {
+		if math.Abs(guess-actual)/math.Abs(actual) < 0.2 {
 			accuracy += 1
 		}
 	}
