@@ -5,7 +5,9 @@ graphviz/
 sumo/
 test_results.txt
 graph.info
-pythonN*/
+pythonNe*/
+pythonNeural/
+pythonNetworkServer/
 generatePlots.py
 plots/
 xprmnts/
