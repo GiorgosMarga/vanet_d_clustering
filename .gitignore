@@ -8,10 +8,8 @@ graph.info
 pythonNe*/
 pythonNeural/
 pythonNetworkServer/
-generatePlots.py
 plots/
 xprmnts/
-*.py
 data/m*
 test_graphs/
 augmented_data/
