@@ -81,7 +81,7 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	}
 
 	sf := string(f)
-	sf = strings.Replace(sf, "\r\n", "\n", -1)
+	sf = strings.ReplaceAll(sf, "\r\n", "\n")
 	splitted := strings.Split(sf, splitter)
 	if len(splitted) != 2 {
 		return fmt.Errorf("failed to split file correctly (%s)", path)

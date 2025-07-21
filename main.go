@@ -36,6 +36,7 @@ func main() {
 		rnpPercentage        float64
 		parsevalError        int
 		lossThreshold        float64
+		data                 string
 	)
 
 	flag.IntVar(&d, "d", 2, "d")
@@ -50,7 +51,7 @@ func main() {
 	flag.Float64Var(&c, "c", 1.0, "c is the weight for degree")
 	flag.Float64Var(&trainSize, "ts", 0.8, "ts is the trainsize for the gru config.")
 
-	flag.IntVar(&hiddenSize, "hs", 15, "hs is the hidden size for gru config.")
+	flag.IntVar(&hiddenSize, "hs", 16, "hs is the hidden size for gru config.")
 
 	flag.IntVar(&inputSize, "is", 32, "is is the input size for gru config.")
 
@@ -68,6 +69,7 @@ func main() {
 	flag.Float64Var(&rnpPercentage, "rnp", 1.0, "rnp is random node partitipation percentage.")
 	flag.IntVar(&parsevalError, "pe", 100, "pe is the parseval error.")
 	flag.Float64Var(&lossThreshold, "lth", 0.001, "lth is the loss threshold.")
+	flag.StringVar(&data, "data", "data_temperatures", "is the folder that contains the data.")
 	flag.Parse()
 
 	f, err := os.ReadDir(graphPath)
@@ -95,6 +97,7 @@ func main() {
 		Patience:            patience,
 		LearningRate:        learningRate,
 		LossThreshold:       lossThreshold,
+		DataPath:            data,
 	}, &node.AlgoConfig{
 		A:                    a,
 		B:                    b,
@@ -128,11 +131,12 @@ func main() {
 		fmt.Printf("Filename: %s -> Connectivity: %d%% | Clusters: %d | AverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
 	}
 	for _, node := range g.PoolOfNodes {
-		if node.IsCH() {
-			fmt.Printf("Node [%d] (cluster head for %d rounds, messages %d, total rounds: %d) predict\n", node.Id, node.ClusterHeadRounds, node.BytesSent, node.TotalRounds)
-			// node.Train()
-			node.Predict()
-		}
+		// if node.IsCH() {
+		fmt.Printf("Node [%d] (cluster head for %d rounds, messages %d, total rounds: %d) predict\n", node.Id, node.ClusterHeadRounds, node.BytesSent, node.TotalRounds)
+		// node.Train()
+		node.Predict()
+
 	}
 
 }
+ 

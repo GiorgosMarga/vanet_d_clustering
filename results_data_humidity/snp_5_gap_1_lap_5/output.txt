@@ -1,0 +1,162 @@
+Successfully created folder: (cars_info)
+Initialized 60 nodes
+All nodes finished training
+Filename: cars_015 -> Connectivity: 7% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_020 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_025 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_030 -> Connectivity: 8% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_035 -> Connectivity: 8% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_040 -> Connectivity: 10% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_045 -> Connectivity: 11% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_050 -> Connectivity: 10% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_055 -> Connectivity: 9% | Clusters: 10 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_060 -> Connectivity: 9% | Clusters: 9 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_065 -> Connectivity: 10% | Clusters: 10 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_070 -> Connectivity: 10% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_075 -> Connectivity: 10% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_080 -> Connectivity: 14% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_085 -> Connectivity: 15% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_090 -> Connectivity: 15% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_095 -> Connectivity: 15% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_100 -> Connectivity: 17% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_105 -> Connectivity: 19% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_110 -> Connectivity: 17% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_115 -> Connectivity: 16% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_120 -> Connectivity: 15% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_125 -> Connectivity: 11% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_130 -> Connectivity: 11% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_135 -> Connectivity: 10% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_140 -> Connectivity: 9% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_145 -> Connectivity: 9% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_150 -> Connectivity: 9% | Clusters: 10 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_155 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_160 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_165 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_170 -> Connectivity: 9% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_175 -> Connectivity: 9% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_180 -> Connectivity: 9% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_185 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_190 -> Connectivity: 7% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_195 -> Connectivity: 8% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_200 -> Connectivity: 9% | Clusters: 10 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_205 -> Connectivity: 10% | Clusters: 9 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_210 -> Connectivity: 9% | Clusters: 10 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_215 -> Connectivity: 8% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_220 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_225 -> Connectivity: 8% | Clusters: 14 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_230 -> Connectivity: 7% | Clusters: 13 | AverageClusterSize: 4
+All nodes finished training
+Filename: cars_235 -> Connectivity: 8% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_240 -> Connectivity: 8% | Clusters: 11 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_245 -> Connectivity: 9% | Clusters: 10 | AverageClusterSize: 6
+All nodes finished training
+Filename: cars_250 -> Connectivity: 9% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_255 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+All nodes finished training
+Filename: cars_260 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 5
+Node [23] (cluster head for 26 rounds, messages 0, total rounds: 50) predict
+Node [46] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [3] (cluster head for 20 rounds, messages 0, total rounds: 50) predict
+Node [16] (cluster head for 30 rounds, messages 0, total rounds: 50) predict
+Node [37] (cluster head for 24 rounds, messages 0, total rounds: 50) predict
+Node [43] (cluster head for 16 rounds, messages 0, total rounds: 50) predict
+Node [52] (cluster head for 16 rounds, messages 0, total rounds: 50) predict
+Node [0] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [9] (cluster head for 28 rounds, messages 0, total rounds: 50) predict
+Node [26] (cluster head for 29 rounds, messages 0, total rounds: 50) predict
+Node [36] (cluster head for 21 rounds, messages 0, total rounds: 50) predict
+Node [59] (cluster head for 24 rounds, messages 0, total rounds: 50) predict
+Node [32] (cluster head for 21 rounds, messages 0, total rounds: 50) predict
+Node [39] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [50] (cluster head for 27 rounds, messages 0, total rounds: 50) predict
+Node [6] (cluster head for 27 rounds, messages 0, total rounds: 50) predict
+Node [25] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [40] (cluster head for 16 rounds, messages 0, total rounds: 50) predict
+Node [55] (cluster head for 19 rounds, messages 0, total rounds: 50) predict
+Node [58] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [1] (cluster head for 31 rounds, messages 0, total rounds: 50) predict
+Node [12] (cluster head for 15 rounds, messages 0, total rounds: 50) predict
+Node [22] (cluster head for 32 rounds, messages 0, total rounds: 50) predict
+Node [34] (cluster head for 9 rounds, messages 0, total rounds: 50) predict
+Node [10] (cluster head for 13 rounds, messages 0, total rounds: 50) predict
+Node [15] (cluster head for 20 rounds, messages 0, total rounds: 50) predict
+Node [30] (cluster head for 20 rounds, messages 0, total rounds: 50) predict
+Node [41] (cluster head for 20 rounds, messages 0, total rounds: 50) predict
+Node [45] (cluster head for 31 rounds, messages 0, total rounds: 50) predict
+Node [31] (cluster head for 8 rounds, messages 0, total rounds: 50) predict
+Node [53] (cluster head for 10 rounds, messages 0, total rounds: 50) predict
+Node [28] (cluster head for 14 rounds, messages 0, total rounds: 50) predict
+Node [33] (cluster head for 14 rounds, messages 0, total rounds: 50) predict
+Node [49] (cluster head for 27 rounds, messages 0, total rounds: 50) predict
+Node [51] (cluster head for 17 rounds, messages 0, total rounds: 50) predict
+Node [57] (cluster head for 9 rounds, messages 0, total rounds: 50) predict
+Node [13] (cluster head for 16 rounds, messages 0, total rounds: 50) predict
+Node [38] (cluster head for 12 rounds, messages 0, total rounds: 50) predict
+Node [48] (cluster head for 28 rounds, messages 0, total rounds: 50) predict
+Node [42] (cluster head for 17 rounds, messages 0, total rounds: 50) predict
+Node [7] (cluster head for 31 rounds, messages 0, total rounds: 50) predict
+Node [8] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [18] (cluster head for 26 rounds, messages 0, total rounds: 50) predict
+Node [21] (cluster head for 21 rounds, messages 0, total rounds: 50) predict
+Node [24] (cluster head for 26 rounds, messages 0, total rounds: 50) predict
+Node [35] (cluster head for 20 rounds, messages 0, total rounds: 50) predict
+Node [47] (cluster head for 27 rounds, messages 0, total rounds: 50) predict
+Node [54] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [2] (cluster head for 14 rounds, messages 0, total rounds: 50) predict
+Node [4] (cluster head for 37 rounds, messages 0, total rounds: 50) predict
+Node [5] (cluster head for 35 rounds, messages 0, total rounds: 50) predict
+Node [14] (cluster head for 21 rounds, messages 0, total rounds: 50) predict
+Node [17] (cluster head for 30 rounds, messages 0, total rounds: 50) predict
+Node [20] (cluster head for 18 rounds, messages 0, total rounds: 50) predict
+Node [11] (cluster head for 24 rounds, messages 0, total rounds: 50) predict
+Node [19] (cluster head for 15 rounds, messages 0, total rounds: 50) predict
+Node [27] (cluster head for 16 rounds, messages 0, total rounds: 50) predict
+Node [29] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [44] (cluster head for 9 rounds, messages 0, total rounds: 50) predict
+Node [56] (cluster head for 22 rounds, messages 0, total rounds: 50) predict

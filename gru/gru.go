@@ -21,6 +21,7 @@ type GRUConfig struct {
 	Patience            int
 	LearningRate        float64
 	LossThreshold       float64
+	DataPath            string
 }
 
 type LossFunction func(yActual [][]float64, yPred [][]float64) float64
@@ -354,12 +355,10 @@ func (g *GRU) Train() error {
 
 		if averageLoss < g.lossThreshold || math.Abs(g.prevLoss-averageLoss) < 1e-6 {
 			g.convergenceRounds = epoch + 1
-			fmt.Printf("Converged at epoch: %d\n", g.convergenceRounds)
 			break
 		}
 		g.prevLoss = averageLoss
 		if g.earlyStop != nil && g.earlyStop.CheckEarlyStop(averageLoss) {
-			fmt.Printf("Early stop at epoch: %d\n", epoch)
 			break
 		}
 		// fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, averageLoss)
@@ -457,11 +456,11 @@ func R2Score(yActual, yPred [][]float64) float64 {
 }
 
 func (g *GRU) ParseFile(filename string) error {
-	f, err := os.ReadFile(filename)
+	fileBytes, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
-
+	f := strings.ReplaceAll(string(fileBytes), "\r\n", "\n")
 	lines := strings.Split(string(f[:len(f)-1]), "\n")
 	var X [][][]float64
 	var Y [][][]float64

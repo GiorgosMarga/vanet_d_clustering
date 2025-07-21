@@ -81,10 +81,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 	}
 	nn := gru.NewGRU(gruConfig)
 
-	// file := rand.Intn(61) % 60
-	file := id % 60
-
-	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "augmented_data", fmt.Sprintf("car_%d.txt", file))); err != nil {
+	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), gruConfig.DataPath, fmt.Sprintf("car_%d.txt", id%60))); err != nil {
 		panic(err)
 	}
 	return &Node{
@@ -190,8 +187,8 @@ func (n *Node) Predict() error {
 	if err != nil {
 		return err
 	}
-	n.f.WriteString(fmt.Sprintf("%+v\n", predicted))
-	n.f.WriteString(fmt.Sprintf("%+v\n", actual))
+	n.f.WriteString(fmt.Sprintf("Predicted: %+v\n", predicted))
+	n.f.WriteString(fmt.Sprintf("Actual: %+v\n", actual))
 	n.f.WriteString(fmt.Sprintf("Errors: %+v\n", n.gru.GetErrors()))
 	n.f.WriteString(fmt.Sprintf("Accuracies: %+v\n", n.gru.GetAccuracies()))
 	return nil
@@ -349,7 +346,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
 		averageMembersWeights = n.handleMembersWeightExchange(clusterSize - similarities)
 		var totalAverage [][][]float64
-		if n.globalRound == n.algoConfig.GlobalAveragePeriod {
+		if n.globalRound == n.globalAveragePeriod {
 			totalAverage = n.handleClusterHeadsWeightExchange(averageMembersWeights, clusters)
 			n.globalRound -= n.globalAveragePeriod // reset
 		} else {
@@ -400,7 +397,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
 		}
 	}
-	if !sendWeights || n.localRound != n.algoConfig.LocalAveragePeriod {
+	if !sendWeights || n.localRound != n.localAveragePeriod {
 		n.localRound++
 		return
 	}
@@ -733,7 +730,6 @@ func (n *Node) RelativeMax(d int) {
 				<-timer.C
 			}
 		case <-timer.C:
-			fmt.Printf("[%d]: CONTINUE expecting from %d\n", n.Id, n.PCH[1].Id)
 			continue
 		}
 
