@@ -15,3 +15,4 @@ test_graphs/
 augmented_data/
 exper_*
 data_distributions/
+results_*/
