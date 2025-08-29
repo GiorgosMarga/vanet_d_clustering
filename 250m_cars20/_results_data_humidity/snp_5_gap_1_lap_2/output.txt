@@ -1,0 +1,215 @@
+Successfully created folder: (cars_info)
+Initialized 60 nodes
+read 250m_cars20//_results_data_elec_usage: is a directory
+read 250m_cars20//_results_data_humidity: is a directory
+read 250m_cars20//_results_data_temperatures: is a directory
+250m_cars20//cars_005.txt 19
+All nodes finished training
+Filename: cars_005 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_010.txt 21
+All nodes finished training
+Filename: cars_010 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_015.txt 21
+All nodes finished training
+Filename: cars_015 -> Connectivity: 13% | Clusters: 5 | AverageClusterSize: 4
+250m_cars20//cars_020.txt 21
+All nodes finished training
+Filename: cars_020 -> Connectivity: 7% | Clusters: 9 | AverageClusterSize: 2
+250m_cars20//cars_025.txt 21
+All nodes finished training
+Filename: cars_025 -> Connectivity: 8% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_030.txt 21
+All nodes finished training
+Filename: cars_030 -> Connectivity: 10% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_035.txt 21
+All nodes finished training
+Filename: cars_035 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_040.txt 21
+All nodes finished training
+Filename: cars_040 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_045.txt 21
+All nodes finished training
+Filename: cars_045 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_050.txt 21
+All nodes finished training
+Filename: cars_050 -> Connectivity: 12% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_055.txt 21
+All nodes finished training
+Filename: cars_055 -> Connectivity: 13% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_060.txt 21
+All nodes finished training
+Filename: cars_060 -> Connectivity: 12% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_065.txt 21
+All nodes finished training
+Filename: cars_065 -> Connectivity: 13% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_070.txt 21
+All nodes finished training
+Filename: cars_070 -> Connectivity: 15% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_075.txt 21
+All nodes finished training
+Filename: cars_075 -> Connectivity: 14% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_080.txt 21
+All nodes finished training
+Filename: cars_080 -> Connectivity: 11% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_085.txt 21
+All nodes finished training
+Filename: cars_085 -> Connectivity: 11% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_090.txt 21
+All nodes finished training
+Filename: cars_090 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_095.txt 21
+All nodes finished training
+Filename: cars_095 -> Connectivity: 14% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_100.txt 21
+All nodes finished training
+Filename: cars_100 -> Connectivity: 14% | Clusters: 5 | AverageClusterSize: 4
+250m_cars20//cars_105.txt 21
+All nodes finished training
+Filename: cars_105 -> Connectivity: 12% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_110.txt 21
+All nodes finished training
+Filename: cars_110 -> Connectivity: 14% | Clusters: 5 | AverageClusterSize: 4
+250m_cars20//cars_115.txt 21
+All nodes finished training
+Filename: cars_115 -> Connectivity: 12% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_120.txt 21
+All nodes finished training
+Filename: cars_120 -> Connectivity: 12% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_125.txt 21
+All nodes finished training
+Filename: cars_125 -> Connectivity: 10% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_130.txt 21
+All nodes finished training
+Filename: cars_130 -> Connectivity: 9% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_135.txt 21
+All nodes finished training
+Filename: cars_135 -> Connectivity: 10% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_140.txt 21
+All nodes finished training
+Filename: cars_140 -> Connectivity: 10% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_145.txt 21
+All nodes finished training
+Filename: cars_145 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_150.txt 21
+All nodes finished training
+Filename: cars_150 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_155.txt 21
+All nodes finished training
+Filename: cars_155 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_160.txt 21
+All nodes finished training
+Filename: cars_160 -> Connectivity: 9% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_165.txt 21
+All nodes finished training
+Filename: cars_165 -> Connectivity: 10% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_170.txt 21
+All nodes finished training
+Filename: cars_170 -> Connectivity: 13% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_175.txt 21
+All nodes finished training
+Filename: cars_175 -> Connectivity: 14% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_180.txt 21
+All nodes finished training
+Filename: cars_180 -> Connectivity: 15% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_185.txt 21
+All nodes finished training
+Filename: cars_185 -> Connectivity: 13% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_190.txt 21
+All nodes finished training
+Filename: cars_190 -> Connectivity: 14% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_195.txt 21
+All nodes finished training
+Filename: cars_195 -> Connectivity: 16% | Clusters: 5 | AverageClusterSize: 4
+250m_cars20//cars_200.txt 21
+All nodes finished training
+Filename: cars_200 -> Connectivity: 16% | Clusters: 6 | AverageClusterSize: 3
+250m_cars20//cars_205.txt 21
+All nodes finished training
+Filename: cars_205 -> Connectivity: 15% | Clusters: 5 | AverageClusterSize: 4
+250m_cars20//cars_210.txt 21
+All nodes finished training
+Filename: cars_210 -> Connectivity: 14% | Clusters: 5 | AverageClusterSize: 4
+250m_cars20//cars_215.txt 21
+All nodes finished training
+Filename: cars_215 -> Connectivity: 15% | Clusters: 4 | AverageClusterSize: 5
+250m_cars20//cars_220.txt 21
+All nodes finished training
+Filename: cars_220 -> Connectivity: 16% | Clusters: 5 | AverageClusterSize: 4
+250m_cars20//cars_225.txt 21
+All nodes finished training
+Filename: cars_225 -> Connectivity: 15% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_230.txt 21
+All nodes finished training
+Filename: cars_230 -> Connectivity: 16% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_235.txt 21
+All nodes finished training
+Filename: cars_235 -> Connectivity: 14% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_240.txt 21
+All nodes finished training
+Filename: cars_240 -> Connectivity: 14% | Clusters: 7 | AverageClusterSize: 3
+250m_cars20//cars_245.txt 21
+All nodes finished training
+Filename: cars_245 -> Connectivity: 12% | Clusters: 8 | AverageClusterSize: 2
+250m_cars20//cars_250.txt 21
+All nodes finished training
+Filename: cars_250 -> Connectivity: 10% | Clusters: 8 | AverageClusterSize: 2
+Node [53] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [6] (cluster head for 10 rounds, messages 0, total rounds: 50) predict
+Node [9] (cluster head for 26 rounds, messages 0, total rounds: 50) predict
+Node [48] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [21] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [30] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [7] (cluster head for 23 rounds, messages 0, total rounds: 50) predict
+Node [13] (cluster head for 13 rounds, messages 0, total rounds: 50) predict
+Node [40] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [3] (cluster head for 19 rounds, messages 0, total rounds: 50) predict
+Node [51] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [55] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [2] (cluster head for 20 rounds, messages 0, total rounds: 50) predict
+Node [4] (cluster head for 13 rounds, messages 0, total rounds: 50) predict
+Node [15] (cluster head for 17 rounds, messages 0, total rounds: 50) predict
+Node [17] (cluster head for 16 rounds, messages 0, total rounds: 50) predict
+Node [35] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [45] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [25] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [34] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [41] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [47] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [33] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [36] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [43] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [46] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [52] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [22] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [37] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [39] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [12] (cluster head for 14 rounds, messages 0, total rounds: 50) predict
+Node [56] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [59] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [10] (cluster head for 7 rounds, messages 0, total rounds: 50) predict
+Node [27] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [29] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [58] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [8] (cluster head for 30 rounds, messages 0, total rounds: 50) predict
+Node [31] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [44] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [20] (cluster head for 19 rounds, messages 0, total rounds: 49) predict
+Node [38] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [16] (cluster head for 28 rounds, messages 0, total rounds: 50) predict
+Node [24] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [28] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [32] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [49] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [0] (cluster head for 26 rounds, messages 0, total rounds: 50) predict
+Node [5] (cluster head for 33 rounds, messages 0, total rounds: 50) predict
+Node [14] (cluster head for 27 rounds, messages 0, total rounds: 50) predict
+Node [26] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [42] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [50] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [57] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [1] (cluster head for 30 rounds, messages 0, total rounds: 50) predict
+Node [11] (cluster head for 34 rounds, messages 0, total rounds: 50) predict
+Node [18] (cluster head for 25 rounds, messages 0, total rounds: 50) predict
+Node [19] (cluster head for 12 rounds, messages 0, total rounds: 49) predict
+Node [23] (cluster head for 0 rounds, messages 0, total rounds: 0) predict
+Node [54] (cluster head for 0 rounds, messages 0, total rounds: 0) predict

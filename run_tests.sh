@@ -14,8 +14,8 @@ lr=0.01
 gaps=(1 2 5)
 laps=(1 2 5)
 # Define data folders
-# data_folders=("data_elec_usage" "data_humidity" "data_temperatures")
-data_folders=("data_humidity" "data_temperatures")
+data_folders=("data_temperatures" "data_elec_usage" "data_humidity")
+# data_folders=("data_humidity" "data_temperatures")
 
 # Loop over each data folder
 for data_folder in "${data_folders[@]}"; do
@@ -29,44 +29,44 @@ for data_folder in "${data_folders[@]}"; do
             echo "Running experiments with lr=$lr, gap=$gap, lap=$lap in $data_folder"
             # Run the Go program and redirect output for simple configuration
             go run main.go -g=$SNAPSHOT -gap=$gap -lap=$lap -lr=$lr -data=$data_folder > "output.txt"
-            mkdir -p results_${data_folder}/anp_gap_${gap}_lap_${lap}
+            mkdir -p ${SNAPSHOT}_results_${data_folder}/anp_gap_${gap}_lap_${lap}
             python3 ./python_utils/cleanCarsInfo.py cars_info/ cars_info/
-            mv output.txt cars_info/ results_${data_folder}/anp_gap_${gap}_lap_${lap}
+            mv output.txt cars_info/ ${SNAPSHOT}_results_${data_folder}/anp_gap_${gap}_lap_${lap}
             echo "Finished simple with lr=$lr, gap=$gap, lap=$lap in $data_folder"
 
             # Run with rnp=0.5
             go run main.go -g=$SNAPSHOT -gap=$gap -lap=$lap -rnp=0.5 -lr=$lr -data=$data_folder > "output.txt"
-            mkdir -p results_${data_folder}/rnp_0_50_gap_${gap}_lap_${lap}
+            mkdir -p ${SNAPSHOT}_results_${data_folder}/rnp_0_50_gap_${gap}_lap_${lap}
             python3 ./python_utils/cleanCarsInfo.py cars_info/ cars_info/
-            mv output.txt cars_info results_${data_folder}/rnp_0_50_gap_${gap}_lap_${lap}
+            mv output.txt cars_info ${SNAPSHOT}_results_${data_folder}/rnp_0_50_gap_${gap}_lap_${lap}
             echo "Finished rnp 0.5 with lr=$lr, gap=$gap, lap=$lap in $data_folder"
 
             # Run with rnp=0.75
             go run main.go -g=$SNAPSHOT -gap=$gap -lap=$lap -rnp=0.75 -lr=$lr -data=$data_folder > "output.txt"
-            mkdir -p results_${data_folder}/rnp_0_75_gap_${gap}_lap_${lap}
+            mkdir -p ${SNAPSHOT}_results_${data_folder}/rnp_0_75_gap_${gap}_lap_${lap}
             python3 ./python_utils/cleanCarsInfo.py cars_info/ cars_info/
-            mv output.txt cars_info results_${data_folder}/rnp_0_75_gap_${gap}_lap_${lap}
+            mv output.txt cars_info ${SNAPSHOT}_results_${data_folder}/rnp_0_75_gap_${gap}_lap_${lap}
             echo "Finished rnp 0.75 with lr=$lr, gap=$gap, lap=$lap in $data_folder"
 
             # Run with pv2s=5, pe=300
             go run main.go -g=$SNAPSHOT -gap=$gap -lap=$lap -pv2s=5 -pe=300 -lr=$lr -data=$data_folder > "output.txt"
-            mkdir -p results_${data_folder}/snp_5_gap_${gap}_lap_${lap}
+            mkdir -p ${SNAPSHOT}_results_${data_folder}/snp_5_gap_${gap}_lap_${lap}
             python3 ./python_utils/cleanCarsInfo.py cars_info/ cars_info/
-            mv output.txt cars_info results_${data_folder}/snp_5_gap_${gap}_lap_${lap}
+            mv output.txt cars_info ${SNAPSHOT}_results_${data_folder}/snp_5_gap_${gap}_lap_${lap}
             echo "Finished snp_5 with lr=$lr, gap=$gap, lap=$lap in $data_folder"
 
             # Run with pv2s=10, pe=300
             go run main.go -g=$SNAPSHOT -gap=$gap -lap=$lap -pv2s=10 -pe=300 -lr=$lr -data=$data_folder > "output.txt"
-            mkdir -p results_${data_folder}/snp_10_gap_${gap}_lap_${lap}
+            mkdir -p ${SNAPSHOT}_results_${data_folder}/snp_10_gap_${gap}_lap_${lap}
             python3 ./python_utils/cleanCarsInfo.py cars_info/ cars_info/
-            mv output.txt cars_info results_${data_folder}/snp_10_gap_${gap}_lap_${lap}
+            mv output.txt cars_info ${SNAPSHOT}_results_${data_folder}/snp_10_gap_${gap}_lap_${lap}
             echo "Finished snp_10 with lr=$lr, gap=$gap, lap=$lap in $data_folder"
 
             # Run with pv2s=20, pe=300
             go run main.go -g=$SNAPSHOT -gap=$gap -lap=$lap -pv2s=20 -pe=300 -lr=$lr -data=$data_folder > "output.txt"
-            mkdir -p results_${data_folder}/snp_20_gap_${gap}_lap_${lap}
+            mkdir -p ${SNAPSHOT}_results_${data_folder}/snp_20_gap_${gap}_lap_${lap}
             python3 ./python_utils/cleanCarsInfo.py cars_info/ cars_info/
-            mv output.txt cars_info results_${data_folder}/snp_20_gap_${gap}_lap_${lap}
+            mv output.txt cars_info ${SNAPSHOT}_results_${data_folder}/snp_20_gap_${gap}_lap_${lap}
             echo "Finished snp_20 with lr=$lr, gap=$gap, lap=$lap in $data_folder"
         done
     done

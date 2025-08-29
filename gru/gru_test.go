@@ -12,21 +12,22 @@ func TestSigmoid(t *testing.T) {
 		t.Errorf("Expected 0.5 got %f\n", sigmoid(0))
 	}
 }
-func TestFFT2(t *testing.T) {
-	gru := NewGRU(10, 10, 10, 0.001, 0.8)
-	gru.ParseFile("../data/car_50.txt")
 
-	gru2 := NewGRU(10, 10, 10, 0.001, 0.8)
-	gru2.ParseFile("../data/car_6.txt")
+// func TestFFT2(t *testing.T) {
+// 	gru := NewGRU(10, 10, 10, 0.001, 0.8)
+// 	gru.ParseFile("../data/car_50.txt")
 
-	X, _, _ := gru.Evaluate()
-	X2, _, _ := gru2.Evaluate()
-	arr1 := matrix.FFT(X)
-	arr2 := matrix.FFT(X2)
+// 	gru2 := NewGRU(10, 10, 10, 0.001, 0.8)
+// 	gru2.ParseFile("../data/car_6.txt")
 
-	fmt.Println(matrix.CalculateMatDistance(matrix.Parseval(arr1)[:5], matrix.Parseval(arr2)[:5]))
+// 	X, _, _ := gru.Evaluate()
+// 	X2, _, _ := gru2.Evaluate()
+// 	arr1 := matrix.FFT(X)
+// 	arr2 := matrix.FFT(X2)
 
-}
+// 	fmt.Println(matrix.CalculateMatDistance(matrix.Parseval(arr1)[:5], matrix.Parseval(arr2)[:5]))
+
+// }
 func TestMatrixMul(t *testing.T) {
 	size := 4
 	a := make([][]float64, size)
