@@ -273,11 +273,11 @@ func Flatten(arr [][]float64) []float64 {
 	return newArr
 }
 
-func Flatten2(arr [][]float64) []float64 {
-	newArr := make([]float64, 0, len(arr)*len(arr[0]))
+func Flatten3D(arr [][][]float64) []float64 {
+	newArr := make([]float64, 0, len(arr)*len(arr[0])*len(arr[0][0]))
 
 	for _, row := range arr {
-		newArr = append(newArr, row...)
+		newArr = append(newArr, Flatten(row)...)
 	}
 
 	return newArr
@@ -317,4 +317,22 @@ func CalculateEuclDistance(arr1, arr2 []complex128) float64 {
 
 	}
 	return res
+}
+
+func CalculateCosineSimilarity(a, b [][][]float64) float64 {
+	fA, fB := Flatten3D(a), Flatten3D(b)
+
+	var dot, normA, normB float64
+	for i := range a {
+		dot += fA[i] * fB[i]
+		normA += fA[i] * fA[i]
+		normB += fB[i] * fB[i]
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0 // avoid division by zero
+	}
+
+	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
+
 }

@@ -42,6 +42,10 @@ const (
 	WeightsService
 	ClusterWeightsService
 	ParsevalService
+	JoinMessageService
+	JoinResponseService
+	ConnectReqService
+	ConnectResService
 )
 
 type Node struct {
@@ -72,6 +76,7 @@ type Node struct {
 	TotalRounds         int
 	algoConfig          *AlgoConfig
 	BytesSent           int
+	VIB                 *VIB
 }
 
 func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gruConfig *gru.GRUConfig, algoConfig *AlgoConfig) *Node {
@@ -101,6 +106,10 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 			WeightsService:        make(chan any),
 			ClusterWeightsService: make(chan any),
 			ParsevalService:       make(chan any),
+			JoinMessageService:    make(chan any),
+			JoinResponseService:   make(chan any),
+			ConnectResService:     make(chan any),
+			ConnectReqService:     make(chan any),
 		},
 		round:               1,
 		finishChan:          make(chan struct{}),
@@ -118,6 +127,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 		ClusterHeadRounds:   0,
 		MessagesSent:        0,
 		algoConfig:          algoConfig,
+		VIB:                 NewVIB(),
 	}
 }
 
@@ -832,7 +842,178 @@ func (n *Node) PCI() int {
 	return len(pciTable)
 }
 
+func (n *Node) InitialState(INTimerMs int) {
+	timer := time.NewTimer(time.Duration(INTimerMs * int(time.Millisecond)))
+	for {
+		select {
+		case msg := <-n.internalChans[BeaconService]:
+			beaconMsg, valid := msg.(*messages.BeaconMessage)
+			if !valid {
+				continue
+			}
+			n.VIB.add(beaconMsg)
+		case <-timer.C:
+			return
+		}
+	}
+}
 
-// func (n *Node) InitialState(INTimerMs int) {
+func (n *Node) ElectionState() {
+	connection := map[int]bool{}
+	chs := n.VIB.getCHs()
 
-// }
+	for _, id := range chs {
+		if _, ok := n.DHopNeighbors[id]; !ok {
+			// not id 1 hop
+			continue
+		}
+
+		if connection[id] {
+			continue
+		}
+
+		n.sendMsg(messages.NewMessage(n.Id, id, messages.DefaultTTL, &messages.JoinMessage{
+			SenderId: n.Id,
+		}))
+
+		timer := time.NewTimer(300 * time.Millisecond)
+	receiveLoop:
+		for {
+			select {
+			case msg := <-n.internalChans[JoinResponseService]:
+				response, ok := msg.(*messages.JoinResponseMessage)
+				if !ok || response.From != id {
+					continue
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+
+				avgSim := n.calculateAvgCoSim(id, response.FLParam)
+				n.VIB.setAvgComSim(id, avgSim)
+				connection[id] = true
+			case <-timer.C:
+				break receiveLoop
+			}
+		}
+
+	}
+
+	for {
+		candidates := make([]int, 0)
+		for k, v := range connection {
+			if v {
+				candidates = append(candidates, k)
+			}
+		}
+		if len(candidates) == 0 {
+			break
+		}
+		bestCandidate := n.VIB.getMinCoSim(candidates)
+
+		n.sendMsg(messages.NewMessage(n.Id, bestCandidate, messages.DefaultTTL, &messages.ConnectReqMessage{SenderId: n.Id}))
+
+		timer := time.NewTimer(300 * time.Millisecond)
+	conResLoop:
+		for {
+			select {
+			case msg := <-n.internalChans[ConnectResService]:
+				resp, ok := msg.(*messages.ConnectResMessage)
+				if !ok || resp.SenderId != bestCandidate {
+					continue
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return
+			case <-timer.C:
+				connection[bestCandidate] = false
+				break conResLoop
+			}
+		}
+	}
+
+	connection = make(map[int]bool)
+	cms := n.VIB.getCMs()
+
+	for _, id := range cms {
+		if connection[id] {
+			continue
+		}
+		n.sendMsg(messages.NewMessage(n.Id, id, messages.DefaultTTL, &messages.JoinMessage{SenderId: n.Id}))
+		timer := time.NewTimer(300 * time.Millisecond)
+	joinResLoop:
+		for {
+			select {
+			case msg := <-n.internalChans[JoinResponseService]:
+				resp, ok := msg.(*messages.JoinResponseMessage)
+				if !ok || resp.From != id {
+					continue
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+
+				avgSim := n.calculateAvgCoSim(id, resp.FLParam)
+				n.VIB.setAvgComSim(id, avgSim)
+				connection[id] = true
+			case <-timer.C:
+				break joinResLoop
+			}
+
+		}
+	}
+
+	for {
+		candidates := make([]int, 0)
+		for k, v := range connection {
+			if v {
+				candidates = append(candidates, k)
+			}
+		}
+		if len(candidates) == 0 {
+			break
+		}
+		bestCandidate := n.VIB.getMinCoSim(candidates)
+
+		n.sendMsg(messages.NewMessage(n.Id, bestCandidate, messages.DefaultTTL, &messages.ConnectReqMessage{SenderId: n.Id}))
+
+		timer := time.NewTimer(300 * time.Millisecond)
+	conResLoop2:
+		for {
+			select {
+			case msg := <-n.internalChans[ConnectResService]:
+				resp, ok := msg.(*messages.ConnectResMessage)
+				if !ok || resp.SenderId != bestCandidate {
+					continue
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return
+			case <-timer.C:
+				connection[bestCandidate] = false
+				break conResLoop2
+			}
+		}
+	}
+
+	// ses := n.VIB.getSEs()
+
+	// for _, id := range ses {
+
+	// }
+
+}
+
+func (n *Node) calculateAvgCoSim(chId int, params [][][]float64) float64 {
+	entry, err := n.VIB.getEntry(chId)
+	if err != nil {
+		fmt.Println("Cant find entry for:", chId)
+	}
+	absSpeedDiff := math.Abs(n.Velocity - entry.velocity)
+	cosSim := matrix.CalculateCosineSimilarity(n.gru.GetWeights(), params)
+	a := 0.5
+
+	return a*absSpeedDiff + (1-a)*(1-cosSim)
+}
