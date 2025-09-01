@@ -483,3 +483,8 @@ func (g *Graph) PlotGraph(filename string, d int) error {
 	f.WriteString("}")
 	return nil
 }
+
+func (g *Graph) HierarchicalClustering() {
+
+}
+

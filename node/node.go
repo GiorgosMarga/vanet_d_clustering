@@ -831,3 +831,8 @@ func (n *Node) PCI() int {
 
 	return len(pciTable)
 }
+
+
+// func (n *Node) InitialState(INTimerMs int) {
+
+// }
