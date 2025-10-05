@@ -1,9 +1,11 @@
-data/
+data/data_elec_usage
+data/data_humidity
 graph_images/
 graph_info/
 graphviz/
-python_utils/
+# python_utils/
 results/
-scripts/
-snapshots/
+# scripts/
+# snapshots/
 sumo/
+results_*/

@@ -44,7 +44,7 @@ func BenchmarkFlatten2(t *testing.B) {
 	arr := createArr(1000)
 
 	for range t.N {
-		Flatten2(arr)
+		Flatten(arr)
 	}
 }
 

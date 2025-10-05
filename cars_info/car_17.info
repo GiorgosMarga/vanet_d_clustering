@@ -1,0 +1,389 @@
+Starting round: 1
+[17]: Sent message to: 21
+[17]: Sent message to: 24
+[17]: Sent message to: 3
+[17]: Sent message to: 9
+Comparing CNN: 17 with 24 (7.749741)
+Comparing CNN: 17 with 21 (9.709032)
+Comparing CNN: 17 with 9 (18.713359)
+Comparing CNN: 17 with 3 (23.941307)
+[17]: Round 1: CNN: 24, PCH: 24
+[17]: Sent message to: 24
+Starting round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 24
+[17]: Sent message to: 3
+[17]: Sent message to: 9
+[17]: Round 2: CNN: 17, PCH: 24
+Finished all rounds my CH: 24
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 24
+[17]: Sent message to: 24
+CH: 24, Weights from: 24
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+[17]: Sent message to: 24
+[17]: Sent message to: 39
+[17]: Sent message to: 9
+Comparing CNN: 17 with 39 (27.003624)
+Comparing CNN: 17 with 9 (32.927655)
+Comparing CNN: 17 with 24 (16.250582)
+Comparing CNN: 17 with 21 (3.916474)
+[17]: Round 1: CNN: 21, PCH: 21
+[17]: Sent message to: 21
+Starting round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 24
+[17]: Sent message to: 39
+[17]: Sent message to: 9
+[17]: Round 2: CNN: 17, PCH: 21
+Finished all rounds my CH: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 24
+[17]: Sent message to: 39
+[17]: Sent message to: 9
+[17]: Sent message to: 21
+[17]: Sent message to: 24
+[17]: Sent message to: 39
+[17]: Sent message to: 9
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 39
+[17]: Sent message to: 39
+CH: 39, Weights from: 39
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+Comparing CNN: 17 with 21 (6.001197)
+Comparing CNN: 17 with 0 (28.570395)
+Comparing CNN: 17 with 6 (31.733845)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 21
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+[17]: Expecting 1 weights
+[17]: Received only 1/2 weights
+[17]: Sent cluster message to: 7
+[17]: Sent cluster message to: 27
+[17]: Sent cluster message to: 31
+[17]: Sent cluster message to: 22
+[17]: Sent cluster message to: 26
+[17]: Sent cluster message to: 33
+[17]: Sent cluster message to: 18
+[17]: Sent cluster message to: 32
+[17]: Sent cluster message to: 9
+[17]: Sent cluster message to: 15
+[17]: Received only: 11/11 weights from chs
+[17]: Received 0 weights
+[17]: Sent message to: 21
+[17]: Sent weights message to: 21
+[17]: Finished exchanging weights
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 0
+Comparing CNN: 17 with 6 (21.500761)
+Comparing CNN: 17 with 0 (17.975305)
+Comparing CNN: 17 with 21 (3.677659)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+[17]: Expecting 2 weights
+[17]: Sent message to: 0
+[17]: Received only 1/3 weights
+[17]: Sent message to: 0
+[17]: Sent weights message to: 0
+[17]: Sent message to: 21
+[17]: Sent weights message to: 21
+[17]: Sent message to: 6
+[17]: Sent weights message to: 6
+[17]: Finished exchanging weights
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+Comparing CNN: 17 with 0 (29.570308)
+Comparing CNN: 17 with 6 (25.814753)
+Comparing CNN: 17 with 21 (3.849257)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 6
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 6
+[17]: Sent message to: 0
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+[17]: Expecting 2 weights
+[17]: Sent message to: 0
+[17]: Received only 1/3 weights
+[17]: Sent cluster message to: 27
+[17]: Sent cluster message to: 33
+[17]: Sent cluster message to: 18
+[17]: Sent cluster message to: 5
+[17]: Sent cluster message to: 9
+[17]: Sent cluster message to: 31
+[17]: Sent cluster message to: 16
+[17]: Sent cluster message to: 36
+[17]: Sent cluster message to: 35
+[17]: Sent cluster message to: 32
+[17]: Received only: 11/11 weights from chs
+[17]: Received 0 weights
+[17]: Sent message to: 0
+[17]: Sent weights message to: 0
+[17]: Sent message to: 21
+[17]: Sent weights message to: 21
+[17]: Sent message to: 6
+[17]: Sent weights message to: 6
+[17]: Finished exchanging weights
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+[17]: Sent message to: 33
+Comparing CNN: 17 with 33 (18.508189)
+Comparing CNN: 17 with 21 (2.603273)
+[17]: Round 1: CNN: 21, PCH: 21
+[17]: Sent message to: 21
+Starting round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 33
+[17]: Round 2: CNN: 17, PCH: 21
+Finished all rounds my CH: 21
+[17]: Sent message to: 33
+[17]: Sent message to: 21
+[17]: Sent message to: 33
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 21
+[17]: Sent message to: 21
+CH: 21, Weights from: 21
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 33
+Comparing CNN: 17 with 29 (27.197494)
+Comparing CNN: 17 with 21 (2.379016)
+Comparing CNN: 17 with 33 (24.473268)
+[17]: Round 1: CNN: 21, PCH: 21
+[17]: Sent message to: 21
+Starting round: 2
+[17]: Sent message to: 33
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Round 2: CNN: 17, PCH: 21
+Finished all rounds my CH: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 33
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 29
+[17]: Sent message to: 29
+CH: 29, Weights from: 29
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 33
+Comparing CNN: 17 with 29 (17.257849)
+Comparing CNN: 17 with 33 (16.671056)
+Comparing CNN: 17 with 21 (4.877225)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 29
+[17]: Sent message to: 33
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 29
+[17]: Sent message to: 29
+CH: 29, Weights from: 29
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 33
+Comparing CNN: 17 with 21 (10.041389)
+Comparing CNN: 17 with 33 (27.382011)
+Comparing CNN: 17 with 29 (5.422297)
+[17]: Round 1: CNN: 29, PCH: 29
+[17]: Sent message to: 29
+Starting round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 33
+[17]: Round 2: CNN: 17, PCH: 29
+Finished all rounds my CH: 29
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 33
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 29
+[17]: Sent message to: 29
+CH: 29, Weights from: 29
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+Comparing CNN: 17 with 21 (2.460000)
+Comparing CNN: 17 with 29 (26.446540)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 29
+[17]: Sent message to: 29
+CH: 29, Weights from: 29
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+Comparing CNN: 17 with 14 (31.339290)
+Comparing CNN: 17 with 21 (3.160139)
+Comparing CNN: 17 with 29 (35.341368)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 21
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 29
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+Sending weights to: 29
+[17]: Sent message to: 29
+CH: 29, Weights from: 29
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+Comparing CNN: 17 with 21 (2.742610)
+Comparing CNN: 17 with 14 (22.072453)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 14
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 14
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 14
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+[17]: Expecting 2 weights
+[17]: Received only 1/3 weights
+[17]: Sent message to: 14
+[17]: Sent weights message to: 14
+[17]: Sent message to: 21
+[17]: Sent weights message to: 21
+[17]: Finished exchanging weights
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+Comparing CNN: 17 with 14 (27.704329)
+Comparing CNN: 17 with 21 (2.080640)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 14
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17
+[17]: Expecting 2 weights
+[17]: Received only 1/3 weights
+[17]: Sent cluster message to: 5
+[17]: Sent cluster message to: 33
+[17]: Sent cluster message to: 28
+[17]: Sent cluster message to: 30
+[17]: Sent cluster message to: 24
+[17]: Sent cluster message to: 12
+[17]: Sent cluster message to: 39
+[17]: Sent cluster message to: 22
+[17]: Sent cluster message to: 1
+[17]: Received only: 10/10 weights from chs
+[17]: Received 0 weights
+[17]: Sent message to: 21
+[17]: Sent weights message to: 21
+[17]: Sent message to: 14
+[17]: Sent weights message to: 14
+[17]: Finished exchanging weights
+Starting round: 1
+[17]: Terminating...
+[17]: Sent message to: 21
+Comparing CNN: 17 with 21 (1.377277)
+Finished all rounds my CH: 17, round: 2
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Sent message to: 21
+[17]: Done sending messages
+Training node 17
+Finished training node 17

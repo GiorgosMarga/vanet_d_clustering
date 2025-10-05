@@ -326,7 +326,6 @@ func (g *GRU) Train() error {
 		var totalLoss float64 = 0
 
 		for batch := 0; batch < len(inputs); batch += g.batchSize {
-
 			batchEnd := min(batch+g.batchSize, len(inputs))
 			batchX := inputs[batch:batchEnd]
 			batchY := targets[batch:batchEnd]
@@ -335,8 +334,9 @@ func (g *GRU) Train() error {
 			for t := range batchX {
 				// Forward pass
 				g.Input = batchX[t]
-				predicted, err := g.forwardPass(0.3)
+				predicted, err := g.forwardPass(0)
 				if err != nil {
+					fmt.Println(err)
 					return err
 				}
 

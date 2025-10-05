@@ -39,6 +39,12 @@ type BeaconMessage struct {
 	Round             int
 	PCI               int
 	ClusterHeadRounds int
+	// used in hierarchical clustering
+	HopsToCH         int
+	ClusteringStatus int
+	IdToCH           int
+	CosSimilarity    float64
+	AvgNeighRelSpeed float64
 }
 
 type CNNMessage struct {
@@ -71,4 +77,20 @@ type ParsevalMessage struct {
 	SenderId       int
 	ParsevalValues []float64
 	Velocity       float64
+}
+
+type JoinMessage struct {
+	SenderId int
+}
+type JoinResponseMessage struct {
+	From    int
+	FLParam [][][]float64
+}
+
+type ConnectReqMessage struct {
+	SenderId int
+}
+
+type ConnectResMessage struct {
+	SenderId int
 }
