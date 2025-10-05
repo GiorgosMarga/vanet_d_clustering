@@ -1,0 +1,133 @@
+Successfully created folder: (cars_info)
+Initialized 100 nodes
+All nodes finished training
+[18]: Received only 1/3 weights
+[15]: Received only 1/3 weights
+[31]: Received only 1/2 weights
+[40]: Received only 1/3 weights
+[11]: Received only 1/3 weights
+[16]: Received only 1/3 weights
+[24]: Received only 1/4 weights
+[4]: Received only 1/2 weights
+[32]: Received only 1/3 weights
+Filename: cars_005 -> Connectivity: 8% | Clusters: 9 | AverageClusterSize: 3
+All nodes finished training
+[1]: Received only 1/3 weights
+[38]: Received only 1/4 weights
+[28]: Received only 1/6 weights
+[5]: Received only 1/5 weights
+[32]: Received only 1/3 weights
+[20]: Received only 1/3 weights
+[39]: Received only 1/5 weights
+[27]: Received only 1/2 weights
+Filename: cars_010 -> Connectivity: 10% | Clusters: 10 | AverageClusterSize: 3
+All nodes finished training
+[7]: Received only 1/3 weights
+[17]: Received only 1/2 weights
+[32]: Received only 1/3 weights
+[15]: Received only 1/6 weights
+[9]: Received only 1/4 weights
+[26]: Received only 1/4 weights
+[18]: Received only 1/3 weights
+[27]: Received only 1/2 weights
+[22]: Received only 1/6 weights
+Filename: cars_015 -> Connectivity: 9% | Clusters: 11 | AverageClusterSize: 3
+All nodes finished training
+[32]: Received only 1/3 weights
+[18]: Received only 1/3 weights
+[16]: Received only 1/3 weights
+[36]: Received only 1/4 weights
+[9]: Received only 1/3 weights
+[35]: Received only 1/6 weights
+[5]: Received only 1/5 weights
+[27]: Received only 1/2 weights
+[17]: Received only 1/3 weights
+Filename: cars_020 -> Connectivity: 9% | Clusters: 11 | AverageClusterSize: 3
+All nodes finished training
+[35]: Received only 1/6 weights
+[17]: Received only 1/3 weights
+[27]: Received only 1/2 weights
+[5]: Received only 1/5 weights
+[16]: Received only 1/3 weights
+[32]: Received only 1/3 weights
+[9]: Received only 1/3 weights
+[18]: Received only 1/3 weights
+[36]: Received only 1/4 weights
+Filename: cars_025 -> Connectivity: 9% | Clusters: 11 | AverageClusterSize: 3
+All nodes finished training
+[25]: Received only 1/5 weights
+[21]: Received only 1/4 weights
+[37]: Received only 1/6 weights
+[9]: Received only 1/4 weights
+[12]: Received only 1/2 weights
+[28]: Received only 1/3 weights
+[7]: Received only 1/3 weights
+[18]: Received only 1/3 weights
+Filename: cars_030 -> Connectivity: 8% | Clusters: 12 | AverageClusterSize: 3
+All nodes finished training
+[24]: Received only 1/3 weights
+[29]: Received only 1/3 weights
+[5]: Received only 1/5 weights
+[31]: Received only 1/3 weights
+[35]: Received only 1/4 weights
+[7]: Received only 1/5 weights
+[1]: Received only 1/3 weights
+[26]: Received only 1/6 weights
+Filename: cars_035 -> Connectivity: 10% | Clusters: 10 | AverageClusterSize: 4
+All nodes finished training
+[22]: Received only 1/7 weights
+[5]: Received only 1/5 weights
+[7]: Received only 1/5 weights
+[26]: Received only 1/6 weights
+[32]: Received only 1/3 weights
+[1]: Received only 1/3 weights
+[29]: Received only 1/3 weights
+Filename: cars_040 -> Connectivity: 12% | Clusters: 9 | AverageClusterSize: 4
+All nodes finished training
+[37]: Received only 1/7 weights
+[1]: Received only 1/3 weights
+[25]: Received only 1/5 weights
+[24]: Received only 1/3 weights
+[29]: Received only 1/3 weights
+[7]: Received only 1/5 weights
+[28]: Received only 1/6 weights
+Filename: cars_045 -> Connectivity: 12% | Clusters: 9 | AverageClusterSize: 4
+All nodes finished training
+[29]: Received only 1/3 weights
+[7]: Received only 1/5 weights
+[26]: Received only 1/6 weights
+[5]: Received only 1/5 weights
+[1]: Received only 1/3 weights
+[32]: Received only 1/3 weights
+[35]: Received only 1/8 weights
+Filename: cars_050 -> Connectivity: 11% | Clusters: 8 | AverageClusterSize: 5
+All nodes finished training
+[13]: Received only 1/2 weights
+[22]: Received only 1/6 weights
+[29]: Received only 1/3 weights
+[32]: Received only 1/3 weights
+[7]: Received only 1/5 weights
+[25]: Received only 1/6 weights
+[26]: Received only 1/6 weights
+[1]: Received only 1/2 weights
+Filename: cars_055 -> Connectivity: 10% | Clusters: 10 | AverageClusterSize: 4
+All nodes finished training
+[17]: Received only 1/3 weights
+[39]: Received only 1/4 weights
+[8]: Received only 1/5 weights
+[16]: Received only 1/6 weights
+[22]: Received only 1/5 weights
+[1]: Received only 1/3 weights
+[5]: Received only 1/5 weights
+[32]: Received only 1/2 weights
+Filename: cars_060 -> Connectivity: 10% | Clusters: 10 | AverageClusterSize: 4
+All nodes finished training
+[17]: Received only 1/3 weights
+[33]: Received only 1/3 weights
+[5]: Received only 1/5 weights
+[39]: Received only 1/3 weights
+[1]: Received only 1/3 weights
+[28]: Received only 1/7 weights
+[12]: Received only 1/3 weights
+[22]: Received only 1/6 weights
+Filename: cars_065 -> Connectivity: 11% | Clusters: 10 | AverageClusterSize: 4

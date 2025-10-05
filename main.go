@@ -42,7 +42,7 @@ func main() {
 	flag.IntVar(&d, "d", 2, "d")
 	flag.IntVar(&minClusterNumber, "m", 3, "The minimum number of cluster members a cluster can have.")
 	flag.StringVar(&graphPath, "g", "snapshots", "The path to the graph folder that contains the graphs.")
-	flag.IntVar(&nodes, "n", 60, "The total number of nodes. Used to create a pool of nodes.")
+	flag.IntVar(&nodes, "n", 100, "The total number of nodes. Used to create a pool of nodes.")
 
 	flag.Float64Var(&a, "a", 0.1, "a is the weight for distance")
 
@@ -130,7 +130,7 @@ func main() {
 		}
 		fmt.Printf("Filename: %s -> Connectivity: %d%% | Clusters: %d | AverageClusterSize: %d\n", filename, int(g.CalculateDensity()*100), g.NumOfClusters(), int(g.AverageClusterSize()))
 	}
-	for _, node := range g.PoolOfNodes {
+	for _, node := range g.Nodes {
 		// if node.IsCH() {
 		fmt.Printf("Node [%d] (cluster head for %d rounds, messages %d, total rounds: %d) predict\n", node.Id, node.ClusterHeadRounds, node.BytesSent, node.TotalRounds)
 		// node.Train()

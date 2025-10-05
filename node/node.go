@@ -42,6 +42,10 @@ const (
 	WeightsService
 	ClusterWeightsService
 	ParsevalService
+	JoinMessageService
+	JoinResponseService
+	ConnectReqService
+	ConnectResService
 )
 
 type Node struct {
@@ -61,7 +65,6 @@ type Node struct {
 	round               int
 	subscribers         map[int]struct{}
 	gru                 neuralnetwork.NeuralNetwork
-	weightMessages      map[int]*messages.WeightsMessage
 	mtx                 *sync.Mutex
 	localAveragePeriod  int
 	localRound          int
@@ -72,6 +75,10 @@ type Node struct {
 	TotalRounds         int
 	algoConfig          *AlgoConfig
 	BytesSent           int
+	// for hierarchical clustering
+	VIB           *VIB
+	cosSimilarity float64
+	averageSpeed  float64
 }
 
 func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gruConfig *gru.GRUConfig, algoConfig *AlgoConfig) *Node {
@@ -81,7 +88,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 	}
 	nn := gru.NewGRU(gruConfig)
 
-	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), gruConfig.DataPath, fmt.Sprintf("car_%d.txt", id%60))); err != nil {
+	if err := nn.ParseFile(filepath.Join(utils.GetProjectRoot(), "data", gruConfig.DataPath, fmt.Sprintf("car_%d.txt", id%60))); err != nil {
 		panic(err)
 	}
 	return &Node{
@@ -92,7 +99,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 		Angle:    angle,
 		CNN:      make([]*Node, d+1),
 		PCH:      make([]*Node, d+1),
-		msgChan:  make(chan *messages.Message, 1000), //TODO: change this
+		msgChan:  make(chan *messages.Message, 5000), //TODO: change this
 		internalChans: map[int]chan any{
 			BeaconService:         make(chan any),
 			CNNService:            make(chan any),
@@ -101,6 +108,10 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 			WeightsService:        make(chan any),
 			ClusterWeightsService: make(chan any),
 			ParsevalService:       make(chan any),
+			JoinMessageService:    make(chan any),
+			JoinResponseService:   make(chan any),
+			ConnectResService:     make(chan any),
+			ConnectReqService:     make(chan any),
 		},
 		round:               1,
 		finishChan:          make(chan struct{}),
@@ -108,7 +119,6 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 		DHopNeighbors:       make(map[int]*Node),
 		subscribers:         make(map[int]struct{}),
 		gru:                 nn,
-		weightMessages:      make(map[int]*messages.WeightsMessage),
 		mtx:                 &sync.Mutex{},
 		localAveragePeriod:  algoConfig.LocalAveragePeriod - 1,
 		localRound:          algoConfig.LocalAveragePeriod - 1,
@@ -118,6 +128,7 @@ func NewNode(id, d int, posx, posy, velocity, angle float64, filename string, gr
 		ClusterHeadRounds:   0,
 		MessagesSent:        0,
 		algoConfig:          algoConfig,
+		VIB:                 NewVIB(),
 	}
 }
 
@@ -126,7 +137,7 @@ func (n *Node) UpdateNode(posx, posy, velocity, angle float64) {
 	n.PosY = posy
 	n.Velocity = velocity
 	n.Angle = angle
-	n.msgChan = make(chan *messages.Message, 1000)
+	n.msgChan = make(chan *messages.Message, 5000)
 	n.internalChans = map[int]chan any{
 		BeaconService:         make(chan any),
 		CNNService:            make(chan any),
@@ -170,6 +181,7 @@ func totalByteSize(data [][][]float64) int {
 func (n *Node) SendWeights() {
 	weights := n.gru.GetWeights()
 	n.BytesSent += totalByteSize(weights)
+	n.f.WriteString(fmt.Sprintf("Sending weights to: %d\n", n.PCH[n.d].Id))
 	n.sendMsg(messages.NewMessage(n.Id, n.PCH[n.d].Id, messages.DefaultTTL, &messages.WeightsMessage{SenderId: n.Id, Weights: weights}))
 }
 func PrintPath(path []*Node) string {
@@ -209,6 +221,7 @@ func (n *Node) handleParsevalExchange(clusterSize int) int {
 	parsevalSimilarities := 0
 	timer := time.NewTimer(500 * time.Millisecond)
 	defer timer.Stop()
+
 	parsevalValues := make([]*messages.ParsevalMessage, 0, clusterSize)
 parsevalLoop:
 	for range clusterSize - 1 {
@@ -253,26 +266,29 @@ func (n *Node) handleMembersWeightExchange(clusterSize int) [][][]float64 {
 	if clusterSize <= 1 {
 		return n.gru.GetWeights()
 	}
-	weights := make([][][][]float64, 1, clusterSize)
+	weights := make([][][][]float64, clusterSize)
 	weights[0] = n.gru.GetWeights()
-	timer := time.NewTimer(500 * time.Millisecond)
+	timer := time.NewTimer(1 * time.Second)
 	defer timer.Stop()
+	idx := 1
 membersLoop:
-	for range int(float64((clusterSize - 1)) * n.algoConfig.RnpPercentage) {
+	for idx < clusterSize {
 		select {
 		case msg := <-n.internalChans[WeightsService]:
 			weightMessage, ok := msg.(*messages.WeightsMessage)
 			if !ok {
 				continue
 			}
-			weights = append(weights, weightMessage.Weights)
+			weights[idx] = weightMessage.Weights
+			idx++
 		case <-timer.C:
-			n.f.WriteString(fmt.Sprintf("[%d]: Received only %d weights\n", n.Id, len(weights)))
+			fmt.Printf("[%d]: Received only %d/%d weights\n", n.Id, idx, clusterSize)
+			n.f.WriteString(fmt.Sprintf("[%d]: Received only %d/%d weights\n", n.Id, idx, clusterSize))
 			break membersLoop
 		}
 
 	}
-	return matrix.CalculateAverageWeights(weights)
+	return matrix.CalculateAverageWeights(weights[:idx])
 }
 
 func (n *Node) handleClusterHeadsWeightExchange(averageWeights [][][]float64, clusters map[int][]int) [][][]float64 {
@@ -290,25 +306,27 @@ func (n *Node) handleClusterHeadsWeightExchange(averageWeights [][][]float64, cl
 	}
 
 	// receive average weights from other cluster heads
-	averageWeightsFromClusters := make([][][][]float64, 1, len(clusters))
+	averageWeightsFromClusters := make([][][][]float64, len(clusters))
 	averageWeightsFromClusters[0] = averageWeights
 
 	// since there is no path to all cluster heads, if cluster doesnt receive
 	// a message from a cluster head, in 500ms, it stops waiting
 	// and calculates the average weights
-	timer := time.NewTimer(500 * time.Millisecond)
+	timer := time.NewTimer(time.Second * 1)
 	defer timer.Stop()
 
+	idx := 1
 	// receive average weights from all other cluster heads
 clustersLoop:
-	for range len(clusters) - 1 {
+	for idx < len(clusters) {
 		select {
 		case msg := <-n.internalChans[ClusterWeightsService]:
 			weightMessage, ok := msg.(*messages.ClusterWeightsMessage)
 			if !ok {
 				continue
 			}
-			averageWeightsFromClusters = append(averageWeightsFromClusters, weightMessage.AverageWeights)
+			averageWeightsFromClusters[idx] = weightMessage.AverageWeights
+			idx++
 		case <-timer.C:
 			n.f.WriteString(fmt.Sprintf("[%d]: Received only: %d/%d weights from chs\n", n.Id, len(averageWeightsFromClusters), len(clusters)))
 			break clustersLoop
@@ -316,8 +334,8 @@ clustersLoop:
 	}
 
 	// calculate average of all cluster heads
-	totalAverage := matrix.CalculateAverageWeights(averageWeightsFromClusters)
-	n.f.WriteString(fmt.Sprintf("[%d]: Received %d weights\n", n.Id, len(averageWeightsFromClusters)-1))
+	totalAverage := matrix.CalculateAverageWeights(averageWeightsFromClusters[:idx])
+	n.f.WriteString(fmt.Sprintf("[%d]: Received %d weights\n", n.Id, idx-1))
 	return totalAverage
 }
 
@@ -327,31 +345,35 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 	clusterSize := int(math.Ceil(float64(len(myCluster)) * n.algoConfig.RnpPercentage))
 
 	if n.IsCH() {
+		// fmt.Printf("[%d]: Expecting %d weights\n", n.Id, clusterSize-1)
 		n.f.WriteString(fmt.Sprintf("[%d]: Expecting %d weights\n", n.Id, clusterSize-1))
 		var similarities int = 0
 		var averageMembersWeights [][][]float64
+
 		if n.algoConfig.ParsevalValuesToSend > 0 {
 			similarities = n.handleParsevalExchange(clusterSize)
 		}
-		if n.algoConfig.ParsevalValuesToSend > 0 || n.algoConfig.RnpPercentage != 1 {
+		if n.algoConfig.RnpPercentage != 1 {
 			ctr := 0
 			for _, nodeId := range myCluster {
 				if ctr >= len(myCluster)-clusterSize {
 					break
 				}
 				ctr += 1
+				// send parseval message to let node know that it wont participate
+				// happens on random node participation
 				n.sendMsg(messages.NewMessage(n.Id, nodeId, messages.DefaultTTL, &messages.ParsevalMessage{SenderId: n.Id}))
 			}
 		}
 
 		averageMembersWeights = n.handleMembersWeightExchange(clusterSize - similarities)
 		var totalAverage [][][]float64
-		if n.globalRound == n.globalAveragePeriod {
-			totalAverage = n.handleClusterHeadsWeightExchange(averageMembersWeights, clusters)
-			n.globalRound -= n.globalAveragePeriod // reset
-		} else {
+		if n.globalAveragePeriod != 0 && n.globalRound != n.globalAveragePeriod {
 			totalAverage = averageMembersWeights
 			n.globalRound++
+		} else {
+			totalAverage = n.handleClusterHeadsWeightExchange(averageMembersWeights, clusters)
+			n.globalRound -= n.globalAveragePeriod // reset
 		}
 
 		// send average weights back to members
@@ -372,11 +394,16 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 	if n.algoConfig.ParsevalValuesToSend > 0 {
 		n.SendParsevalValues()
 	}
-
 	var sendWeights = true
+	if n.localAveragePeriod != 0 && n.localRound != n.localAveragePeriod {
+		n.localRound++
+		sendWeights = false
+	} else {
+		n.localRound -= n.localAveragePeriod
+	}
 	timer := time.NewTimer(1 * time.Second)
 	defer timer.Stop()
-	if n.algoConfig.ParsevalValuesToSend > 0 || n.algoConfig.RnpPercentage != 1 {
+	if sendWeights && (n.algoConfig.ParsevalValuesToSend > 0 || n.algoConfig.RnpPercentage != 1) {
 		select {
 		case msg := <-n.internalChans[ParsevalService]:
 			parsevalResponse, ok := msg.(*messages.ParsevalMessage)
@@ -386,7 +413,6 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 			// if cluster head sends back a parseval messages it means that this node should not send the weights
 			// for x rounds
 			if parsevalResponse.SenderId == n.PCH[n.d].Id {
-				n.localRound -= 1
 				if !timer.Stop() {
 					<-timer.C
 				}
@@ -397,11 +423,11 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 
 		}
 	}
-	if !sendWeights || n.localRound != n.localAveragePeriod {
-		n.localRound++
-		return
+	if sendWeights {
+		n.SendWeights()
 	}
-	timer.Reset(1 * time.Second)
+	timer2 := time.NewTimer(2 * time.Second)
+	defer timer2.Stop()
 	select {
 	case msg := <-n.internalChans[WeightsService]:
 		weightsMessage, ok := msg.(*messages.WeightsMessage)
@@ -412,7 +438,7 @@ func (n *Node) HandleWeightsExchange(clusters map[int][]int) {
 			panic(err)
 		}
 		n.f.WriteString(fmt.Sprintf("CH: %d, Weights from: %d\n", n.PCH[n.d].Id, weightsMessage.SenderId))
-	case <-timer.C:
+	case <-timer2.C:
 		n.f.WriteString(fmt.Sprintf("[%d]: Did not receive weights\n", n.Id))
 	}
 }
@@ -427,6 +453,10 @@ func (n *Node) SendParsevalValues() {
 		Velocity:       n.Velocity,
 	}))
 
+}
+
+func (n *Node) hasSameDirection(angle float64) bool {
+	return math.Abs(n.Angle-angle) <= 10
 }
 
 func (n *Node) AddNeighbor(neighbor *Node) {
@@ -483,6 +513,7 @@ func (n *Node) bcast(msg *messages.Message) {
 				<-timer.C
 			}
 		case <-timer.C:
+			fmt.Printf("Failed to send message (bcast) to: (%d) %v %d\n", cn.Id, msg.Msg, len(n.DHopNeighbors))
 			n.f.WriteString(fmt.Sprintf("Failed to send message (bcast) to: (%d) %v %d\n", cn.Id, msg.Msg, len(n.DHopNeighbors)))
 		}
 	}
@@ -494,6 +525,7 @@ func (n *Node) sendMsg(msg *messages.Message) {
 	if c, ok := n.DHopNeighbors[msg.To]; ok {
 		select {
 		case c.msgChan <- msg:
+			fmt.Fprintf(n.f, "[%d]: Sent message to: %d\n", n.Id, msg.To)
 		case <-timer.C:
 			n.f.WriteString(fmt.Sprintf("[%d]: Failed to send message to: (%d)\n", n.Id, msg.To))
 		}
@@ -597,7 +629,7 @@ func (n *Node) Start(ctx context.Context, d int) {
 			n.f.WriteString(fmt.Sprintf("[%d]: Terminating...\n", n.Id))
 			return
 		default:
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
@@ -832,7 +864,260 @@ func (n *Node) PCI() int {
 	return len(pciTable)
 }
 
+func (n *Node) InitialState(INTimerMs int) {
+	timer := time.NewTimer(time.Duration(INTimerMs * int(time.Millisecond)))
+	for {
+		select {
+		case msg := <-n.internalChans[BeaconService]:
+			beaconMsg, valid := msg.(*messages.BeaconMessage)
+			if !valid {
+				continue
+			}
+			n.VIB.add(beaconMsg)
+		case <-timer.C:
+			return
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+}
 
-// func (n *Node) InitialState(INTimerMs int) {
+func (n *Node) ElectionState() {
+	connection := map[int]bool{}
+	chs := n.VIB.getCHs()
 
-// }
+	for _, id := range chs {
+		if _, ok := n.DHopNeighbors[id]; !ok {
+			// not id 1 hop
+			continue
+		}
+
+		if connection[id] {
+			continue
+		}
+		n.sendMsg(messages.NewMessage(n.Id, id, messages.DefaultTTL, &messages.JoinMessage{
+			SenderId: n.Id,
+		}))
+
+		timer := time.NewTimer(300 * time.Millisecond)
+
+	receiveLoop:
+		for {
+			select {
+			case msg := <-n.internalChans[JoinResponseService]:
+				response, ok := msg.(*messages.JoinResponseMessage)
+				if !ok || response.From != id {
+					continue
+				}
+
+				if !timer.Stop() {
+					<-timer.C
+				}
+
+				avgSim := n.calculateAvgCoSim(id, response.FLParam)
+				n.VIB.setAvgComSim(id, avgSim)
+				connection[id] = true
+			case <-timer.C:
+				break receiveLoop
+			}
+		}
+
+	}
+
+	for {
+		candidates := make([]int, 0)
+		for k, v := range connection {
+			if v {
+				candidates = append(candidates, k)
+			}
+
+		}
+		if len(candidates) == 0 {
+			break
+		}
+		bestCandidate := n.VIB.getMinCoSim(candidates)
+
+		n.sendMsg(messages.NewMessage(n.Id, bestCandidate, messages.DefaultTTL, &messages.ConnectReqMessage{SenderId: n.Id}))
+
+		timer := time.NewTimer(300 * time.Millisecond)
+	conResLoop:
+		for {
+			select {
+			case msg := <-n.internalChans[ConnectResService]:
+				resp, ok := msg.(*messages.ConnectResMessage)
+				if !ok || resp.SenderId != bestCandidate {
+					continue
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return
+			case <-timer.C:
+				connection[bestCandidate] = false
+				break conResLoop
+			}
+		}
+	}
+
+	connection = make(map[int]bool)
+	cms := n.VIB.getCMs()
+
+	for _, id := range cms {
+		// add dNumberofhops>=MAXHOP−1
+		if connection[id] {
+			continue
+		}
+		n.sendMsg(messages.NewMessage(n.Id, id, messages.DefaultTTL, &messages.JoinMessage{SenderId: n.Id}))
+		timer := time.NewTimer(300 * time.Millisecond)
+
+	joinResLoop:
+		for {
+			select {
+			case msg := <-n.internalChans[JoinResponseService]:
+				resp, ok := msg.(*messages.JoinResponseMessage)
+				if !ok || resp.From != id {
+					continue
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+
+				avgSim := n.calculateAvgCoSim(id, resp.FLParam)
+				n.VIB.setAvgComSim(id, avgSim)
+				connection[id] = true
+			case <-timer.C:
+				break joinResLoop
+			}
+		}
+	}
+
+	for {
+		candidates := make([]int, 0)
+		for k, v := range connection {
+			if v {
+				candidates = append(candidates, k)
+			}
+		}
+		if len(candidates) == 0 {
+			break
+		}
+		bestCandidate := n.VIB.getMinCoSim(candidates)
+		n.sendMsg(messages.NewMessage(n.Id, bestCandidate, messages.DefaultTTL, &messages.ConnectReqMessage{SenderId: n.Id}))
+		timer := time.NewTimer(300 * time.Millisecond)
+
+	conResLoop2:
+		for {
+			select {
+			case msg := <-n.internalChans[ConnectResService]:
+				resp, ok := msg.(*messages.ConnectResMessage)
+				if !ok || resp.SenderId != bestCandidate {
+					continue
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return
+			case <-timer.C:
+				connection[bestCandidate] = false
+				break conResLoop2
+			}
+		}
+	}
+	seIds := make([]int, 0)
+	for k, entry := range n.VIB.m {
+		if entry.clusteringStatus != ClusterStatusSE {
+			continue
+		}
+		seIds = append(seIds, k)
+		avgComSim := 0.5*entry.avgRelSpeed + 0.5*(1-entry.cosSim)
+		n.VIB.setAvgComSim(k, avgComSim)
+	}
+	if n.calcAvgCoSim() < n.VIB.getMinValCoSim(seIds) {
+		// state ch
+	}
+	// repeat state?
+}
+
+func (n *Node) calculateAvgCoSim(chId int, params [][][]float64) float64 {
+	entry, err := n.VIB.getEntry(chId)
+	if err != nil {
+		fmt.Println("Cant find entry for:", chId)
+	}
+	absSpeedDiff := math.Abs(n.Velocity - entry.velocity)
+	cosSim := matrix.CalculateCosineSimilarity(n.gru.GetWeights(), params)
+	a := 0.5
+
+	return a*absSpeedDiff + (1-a)*(1-cosSim)
+}
+
+// TODO: remove this
+func (n *Node) calcAvgCoSim() float64 {
+
+	return 0.5*n.averageSpeed + (0.5)*(1-n.cosSimilarity)
+}
+
+func (n *Node) CHState() {
+	chConnect := make([]int, 0)
+	for k, entry := range n.VIB.m {
+		// for all chs
+		if entry.clusteringStatus != ClusterStatusCH {
+			continue
+		}
+		// for all chs in 1 hop
+		if _, ok := n.DHopNeighbors[k]; !ok {
+			continue
+		}
+		chConnect = append(chConnect, k)
+		avgCoSim := 0.5*entry.avgRelSpeed + 0.5*(1-entry.cosSim)
+		n.VIB.setAvgComSim(k, avgCoSim)
+	}
+
+connectLoop:
+	for i, k := range chConnect {
+		chk := n.VIB.getMinValCoSim(chConnect[i:])
+		if chk < n.cosSimilarity {
+			n.sendMsg(messages.NewMessage(n.Id, k, messages.DefaultTTL, messages.ConnectReqMessage{
+				SenderId: n.Id,
+			}))
+
+			timer := time.NewTimer(500 * time.Millisecond)
+
+			for {
+				select {
+				case msg := <-n.internalChans[ConnectResService]:
+					resp, ok := msg.(*messages.ConnectResMessage)
+					if !ok || resp.SenderId != k {
+						continue
+					}
+					if !timer.Stop() {
+						<-timer.C
+					}
+					// TODO: CM state
+					return
+				case <-timer.C:
+					continue connectLoop
+				}
+			}
+		} else {
+			return
+		}
+	}
+}
+
+func (n *Node) CMState() {
+	timer := time.NewTimer(500 * time.Millisecond)
+
+	for {
+		select {
+		case msg := <-n.internalChans[WeightsService]:
+			n.internalChans[WeightsService] <- msg
+			timer.Reset(500 * time.Millisecond)
+		case <-timer.C:
+			// state se
+			return
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+
+}

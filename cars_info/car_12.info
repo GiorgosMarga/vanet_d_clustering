@@ -1,0 +1,306 @@
+Starting round: 1
+[12]: Sent message to: 29
+[12]: Sent message to: 32
+Comparing CNN: 12 with 32 (4.586618)
+Comparing CNN: 12 with 29 (6.436200)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 32
+[12]: Sent message to: 29
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 29
+[12]: Sent message to: 32
+Comparing CNN: 12 with 29 (15.405530)
+Comparing CNN: 12 with 32 (4.378098)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 29
+[12]: Sent message to: 32
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Sent message to: 29
+[12]: Sent message to: 32
+[12]: Sent message to: 29
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+Comparing CNN: 12 with 32 (5.268377)
+Comparing CNN: 12 with 14 (32.014733)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+Comparing CNN: 12 with 32 (5.064470)
+Comparing CNN: 12 with 14 (19.184328)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+Comparing CNN: 12 with 14 (29.422730)
+Comparing CNN: 12 with 32 (5.492646)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Sent message to: 32
+[12]: Sent message to: 14
+[12]: Sent message to: 14
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 32
+Comparing CNN: 12 with 32 (5.446078)
+Finished all rounds my CH: 12, round: 2
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+[12]: Expecting 1 weights
+[12]: Received only 1/2 weights
+[12]: Sent cluster message to: 28
+[12]: Sent cluster message to: 7
+[12]: Sent cluster message to: 25
+[12]: Sent cluster message to: 18
+[12]: Sent cluster message to: 21
+[12]: Sent cluster message to: 30
+[12]: Sent cluster message to: 13
+[12]: Sent cluster message to: 37
+[12]: Sent cluster message to: 9
+[12]: Sent cluster message to: 27
+[12]: Sent cluster message to: 14
+[12]: Received only: 12/12 weights from chs
+[12]: Received 0 weights
+[12]: Sent message to: 32
+[12]: Sent weights message to: 32
+[12]: Finished exchanging weights
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 32
+[12]: Sent message to: 24
+[12]: Sent message to: 27
+Comparing CNN: 12 with 24 (28.479974)
+Comparing CNN: 12 with 32 (5.537686)
+Comparing CNN: 12 with 27 (30.185403)
+Finished all rounds my CH: 12, round: 2
+[12]: Sent message to: 24
+[12]: Sent message to: 27
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Sent message to: 24
+[12]: Sent message to: 27
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 24
+[12]: Sent message to: 24
+CH: 24, Weights from: 24
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 24
+[12]: Sent message to: 27
+[12]: Sent message to: 32
+Comparing CNN: 12 with 27 (18.411804)
+Comparing CNN: 12 with 24 (22.794788)
+Comparing CNN: 12 with 32 (6.825010)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 27
+[12]: Sent message to: 32
+[12]: Sent message to: 24
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 24
+[12]: Sent message to: 27
+[12]: Sent message to: 32
+Comparing CNN: 12 with 24 (23.998322)
+Comparing CNN: 12 with 27 (29.751175)
+Comparing CNN: 12 with 32 (6.686078)
+Finished all rounds my CH: 12, round: 2
+[12]: Sent message to: 27
+[12]: Sent message to: 32
+[12]: Sent message to: 24
+[12]: Sent message to: 32
+[12]: Sent message to: 24
+[12]: Sent message to: 27
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 24
+[12]: Sent message to: 24
+CH: 24, Weights from: 24
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 24
+[12]: Sent message to: 32
+Comparing CNN: 12 with 24 (18.906647)
+Comparing CNN: 12 with 32 (6.004319)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 24
+[12]: Sent message to: 32
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Sent message to: 24
+[12]: Sent message to: 32
+[12]: Sent message to: 24
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 32
+Comparing CNN: 12 with 32 (5.840163)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 32
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 32
+Comparing CNN: 12 with 32 (7.186817)
+[12]: Round 1: CNN: 32, PCH: 32
+[12]: Sent message to: 32
+Starting round: 2
+[12]: Sent message to: 32
+[12]: Round 2: CNN: 12, PCH: 32
+Finished all rounds my CH: 32
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+Sending weights to: 32
+[12]: Sent message to: 32
+CH: 32, Weights from: 32
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+Comparing CNN: 12 with 32 (8.927887)
+Comparing CNN: 12 with 10 (35.959346)
+Finished all rounds my CH: 12, round: 2
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+[12]: Done sending messages
+Training node 12
+Finished training node 12
+[12]: Expecting 2 weights
+[12]: Received only 1/3 weights
+[12]: Sent message to: 32
+[12]: Sent weights message to: 32
+[12]: Sent message to: 10
+[12]: Sent weights message to: 10
+[12]: Finished exchanging weights
+Starting round: 1
+[12]: Terminating...
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+Comparing CNN: 12 with 10 (25.196363)
+Comparing CNN: 12 with 32 (7.884156)
+Finished all rounds my CH: 12, round: 2
+[12]: Sent message to: 32
+[12]: Sent message to: 10
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+[12]: Sent message to: 10
+[12]: Sent message to: 32
+[12]: Sent message to: 32
+[12]: Sent message to: 10
+[12]: Done sending messages
+Training node 12
+Finished training node 12

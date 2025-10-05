@@ -88,9 +88,9 @@ func (g *Graph) ParseGraphFile(path string, splitter string) error {
 	}
 
 	nodes, connections := string(splitted[0]), string(splitted[1])[:len(string(splitted[1]))-1]
-	if len(strings.Split(nodes, "\n")) != 60 {
-		fmt.Println(path, len(strings.Split(nodes, "\n")))
-	}
+	// if len(strings.Split(nodes, "\n")) != 60 {
+	// 	fmt.Println(path, len(strings.Split(nodes, "\n")))
+	// }
 	for _, n := range strings.Split(nodes, "\n") {
 		splitted := strings.Split(strings.TrimSpace(n), " ")
 		if len(splitted) != 5 {
@@ -487,4 +487,3 @@ func (g *Graph) PlotGraph(filename string, d int) error {
 func (g *Graph) HierarchicalClustering() {
 
 }
-
