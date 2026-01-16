@@ -135,7 +135,6 @@ func main() {
 		fmt.Printf("Node [%d] (cluster head for %d rounds, messages %d, total rounds: %d) predict\n", node.Id, node.ClusterHeadRounds, node.BytesSent, node.TotalRounds)
 		// node.Train()
 		node.Predict()
-
 	}
 
 }
